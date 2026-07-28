@@ -2,7 +2,7 @@
 Supply Chain Orchestrator — Streamlit User Interface & Demo Dashboard
 
 Features:
-  - Sleek dark-mode glassmorphism interface ("Supply Chain Orchestrator - CampusOS")
+  - Mode Selection: "Day 1: Single Agent Mode" vs "Day 2: Multi-Agent Supervisor"
   - Interactive chat interface powered by FastAPI backend & LangGraph supervisor
   - One-click sample query triggers for judges & recruiters
   - Real-time agent state inspector sidebar displaying domain sub-states
@@ -86,7 +86,6 @@ CUSTOM_CSS = """
     .stChatMessage {
         background-color: #161b22;
         border: 1px solid #30363d;
-        border-radius: 10px;
     }
 
     /* Sidebar Styling */
@@ -118,8 +117,8 @@ st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
 # ── API Backend Configuration ─────────────────────────────────
 
-BACKEND_URL = "http://localhost:8000/api/workflow"
-HEALTH_URL = "http://localhost:8000/health"
+API_BASE_URL = "http://localhost:8000"
+HEALTH_URL = f"{API_BASE_URL}/health"
 
 
 # ── Session State Initialization ──────────────────────────────
@@ -129,15 +128,11 @@ if "messages" not in st.session_state:
         {
             "role": "assistant",
             "content": (
-                "👋 Hello! I am the **Supply Chain Orchestrator Supervisor**.\n\n"
-                "I route your logistics requests across 6 specialized AI agents:\n"
-                "- 📦 **Inventory Planning** (Stock levels & reordering)\n"
-                "- 🏬 **Warehouse Operations** (Capacity & bin allocation)\n"
-                "- 📈 **Demand Forecasting** (Exponential Smoothing & trends)\n"
-                "- 🛣️ **Route Optimization** (Nearest Neighbor TSP & traffic)\n"
-                "- 🚚 **Fleet Management** (Telemetry & maintenance)\n"
-                "- 💬 **Customer Notification** (Empathetic Email & SMS)\n\n"
-                "Try typing a query below or select a sample query!"
+                "👋 Hello! Welcome to the **Supply Chain Orchestrator**.\n\n"
+                "**Choose your mode in the sidebar:**\n"
+                "- **Day 1: Single Agent Mode** — Query a specific single AI agent directly.\n"
+                "- **Day 2: Multi-Agent Supervisor** — Execute the full LangGraph orchestrator graph.\n\n"
+                "Try typing a query below or click a sample prompt!"
             ),
         }
     ]
@@ -161,14 +156,13 @@ st.markdown(
 )
 
 
-# ── Sidebar: Real-Time Agent Memory & State Inspector ──────────
+# ── Sidebar: Mode Selection & Real-Time State Inspector ───────
 
 with st.sidebar:
     st.image("https://img.icons8.com/isometric/100/container-truck.png", width=64)
-    st.title("🧠 Agent State Inspector")
-    st.caption("Live Shared GlobalLogisticsState Monitor (For Judges)")
+    st.title("🎛️ Control & Memory Inspector")
 
-    # Backend Connection Status Check
+    # API Connection Check
     try:
         health_resp = requests.get(HEALTH_URL, timeout=2)
         if health_resp.status_code == 200:
@@ -176,15 +170,54 @@ with st.sidebar:
         else:
             st.error("🔴 API Server Unhealthy")
     except Exception:
-        st.warning("⚠️ Local API Server Offline. Please run `python main.py`.")
+        st.warning("⚠️ Local API Server Offline. Run `python main.py`.")
 
     st.markdown("---")
 
+    # ── Mode Selection (Day 1 vs Day 2) ────────────────────────
+    st.subheader("⚙️ Orchestration Mode")
+    app_mode = st.radio(
+        "Select Execution Paradigm:",
+        ["Day 2: Multi-Agent Supervisor", "Day 1: Single Agent Mode"],
+        index=0,
+        help="Switch between Day 1 single agent execution and Day 2 LangGraph supervisor graph.",
+    )
+
+    selected_agent_key = "inventory"
+    if app_mode == "Day 1: Single Agent Mode":
+        st.info("💡 Direct Single-Agent Mode Active (Bypasses LangGraph Supervisor)")
+        selected_agent_label = st.selectbox(
+            "Target Single AI Agent:",
+            [
+                "📦 Inventory Planning Agent",
+                "🏬 Warehouse Operations Agent",
+                "📈 Demand Forecasting Agent",
+                "🛣️ Route Optimization Agent",
+                "🚚 Fleet Management Agent",
+                "💬 Customer Notification Agent",
+            ],
+            index=0,
+        )
+        agent_key_map = {
+            "📦 Inventory Planning Agent": "inventory",
+            "🏬 Warehouse Operations Agent": "warehouse",
+            "📈 Demand Forecasting Agent": "demand",
+            "🛣️ Route Optimization Agent": "route",
+            "🚚 Fleet Management Agent": "fleet",
+            "💬 Customer Notification Agent": "notification",
+        }
+        selected_agent_key = agent_key_map[selected_agent_label]
+    else:
+        st.success("🌐 Multi-Agent LangGraph Supervisor Active")
+
+    st.markdown("---")
+
+    # ── Real-Time State Inspector ─────────────────────────────
+    st.subheader("📊 Live State Inspector (For Judges)")
+
     state = st.session_state.current_state
 
-    # Top-Level Summary Metrics
     if state:
-        st.subheader("📊 Fleet & Ops Snapshot")
         col1, col2 = st.columns(2)
 
         inv_alerts = len(state.get("inventory", {}).get("low_stock_alerts", []))
@@ -220,67 +253,54 @@ with st.sidebar:
 
     st.subheader("🔍 Domain Sub-States")
 
-    # 1. Inventory State
     with st.expander("📦 Inventory Planning State", expanded=False):
         inv_data = state.get("inventory", {})
         if inv_data:
             st.write(f"**Low Stock Alerts:** {len(inv_data.get('low_stock_alerts', []))}")
-            st.write(f"**Reorder Plans:** {len(inv_data.get('reorder_recommendations', []))}")
             st.json(inv_data)
         else:
-            st.info("No inventory state updates yet.")
+            st.info("No inventory state updates.")
 
-    # 2. Warehouse State
     with st.expander("🏬 Warehouse Operations State", expanded=False):
         wh_data = state.get("warehouse", {})
         if wh_data:
             st.write(f"**Utilisation:** {wh_data.get('utilization_pct', 0)}%")
-            st.write(f"**Pending Picks:** {len(wh_data.get('pending_picks', []))}")
             st.json(wh_data)
         else:
-            st.info("No warehouse state updates yet.")
+            st.info("No warehouse state updates.")
 
-    # 3. Demand Forecasting State
     with st.expander("📈 Demand Forecasting State", expanded=False):
         demand_data = state.get("demand", {})
         if demand_data:
-            st.write(f"**Forecast Period:** {demand_data.get('forecast_period_days', 7)} days")
-            st.write(f"**Forecasted Products:** {len(demand_data.get('forecast_results', []))}")
+            st.write(f"**Forecast Window:** {demand_data.get('forecast_period_days', 7)} days")
             st.json(demand_data)
         else:
-            st.info("No demand state updates yet.")
+            st.info("No demand state updates.")
 
-    # 4. Route Optimization State
     with st.expander("🛣️ Route Optimization State", expanded=False):
         route_data = state.get("route", {})
         if route_data:
             st.write(f"**Distance:** {route_data.get('total_distance_km', 0)} km")
-            st.write(f"**Stops:** {len(route_data.get('stops', []))}")
             st.json(route_data)
         else:
-            st.info("No route state updates yet.")
+            st.info("No route state updates.")
 
-    # 5. Fleet Management State
     with st.expander("🚚 Fleet Management State", expanded=False):
         fleet_data = state.get("fleet", {})
         if fleet_data:
-            st.write(f"**Vehicle ID:** {fleet_data.get('vehicle_id', 'N/A')}")
-            st.write(f"**Maintenance Alerts:** {len(fleet_data.get('maintenance_alerts', []))}")
+            st.write(f"**Alerts Count:** {len(fleet_data.get('maintenance_alerts', []))}")
             st.json(fleet_data)
         else:
-            st.info("No fleet state updates yet.")
+            st.info("No fleet state updates.")
 
-    # 6. Customer Notification State
     with st.expander("💬 Customer Notification State", expanded=False):
         notif_data = state.get("notification", {})
         if notif_data:
             st.write(f"**Customer:** {notif_data.get('customer_name', 'N/A')}")
-            st.write(f"**Event Type:** {notif_data.get('event_type', 'N/A')}")
             st.json(notif_data)
         else:
-            st.info("No notification state updates yet.")
+            st.info("No notification state updates.")
 
-    # 7. Complete Raw JSON State
     with st.expander("⚙️ Complete GlobalLogisticsState JSON", expanded=False):
         if state:
             st.json(state)
@@ -293,7 +313,6 @@ with st.sidebar:
 st.markdown("##### ⚡ Quick Demo Queries (Click to Run)")
 
 demo_cols = st.columns(4)
-
 selected_prompt = None
 
 with demo_cols[0]:
@@ -317,32 +336,48 @@ with demo_cols[3]:
 
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
-        st.markdown(msg["content"])
+        st.markdown(msg["content"], unsafe_allow_html=True)
 
 
-# ── Chat Input & Agent Processing ─────────────────────────────
+# ── Chat Input & Processing ──────────────────────────────────
 
-user_input = st.chat_input("Ask Supply Chain Orchestrator a query (e.g., 'Check fleet telemetry and notify customer')...")
+user_input = st.chat_input(
+    f"Type your prompt ({'Single Agent: ' + selected_agent_key if app_mode == 'Day 1: Single Agent Mode' else 'Multi-Agent Supervisor'})..."
+)
 
-# Override with selected quick prompt button if clicked
 prompt_to_send = selected_prompt or user_input
 
 if prompt_to_send:
-    # 1. Add user query to chat history
     st.session_state.messages.append({"role": "user", "content": prompt_to_send})
     with st.chat_message("user"):
         st.markdown(prompt_to_send)
 
-    # 2. Call FastAPI backend and display assistant spinner
     with st.chat_message("assistant"):
-        with st.spinner("🤖 LangGraph Supervisor routing to AI agents..."):
+        spinner_msg = (
+            f"🤖 Executing Single Agent: `{selected_agent_key}`..."
+            if app_mode == "Day 1: Single Agent Mode"
+            else "🤖 LangGraph Supervisor routing across multi-agent graph..."
+        )
+
+        with st.spinner(spinner_msg):
             try:
                 t0 = time.perf_counter()
-                response = requests.post(
-                    BACKEND_URL,
-                    json={"query": prompt_to_send, "intent": "general_check"},
-                    timeout=90,
-                )
+
+                # Determine target URL & payload based on active mode
+                if app_mode == "Day 1: Single Agent Mode":
+                    target_url = f"{API_BASE_URL}/api/agent/{selected_agent_key}"
+                    payload = {
+                        "query": prompt_to_send,
+                        "state": st.session_state.current_state,
+                    }
+                else:
+                    target_url = f"{API_BASE_URL}/api/workflow"
+                    payload = {
+                        "query": prompt_to_send,
+                        "intent": "general_check",
+                    }
+
+                response = requests.post(target_url, json=payload, timeout=90)
                 elapsed_s = round(time.perf_counter() - t0, 2)
 
                 if response.status_code == 200:
@@ -351,7 +386,7 @@ if prompt_to_send:
                     st.session_state.current_state = final_state
 
                     final_answer = res_data.get("final_answer") or final_state.get(
-                        "final_answer", "Workflow completed successfully."
+                        "final_answer", "Agent executed successfully."
                     )
 
                     # Build execution trail badges
@@ -362,8 +397,10 @@ if prompt_to_send:
                         if h.get("agent") and h.get("agent") != "supervisor"
                     ]
 
-                    badge_html = "<div><b>Executed Agents:</b> "
-                    if executed_agents:
+                    badge_html = "<div><b>Executed Agent(s):</b> "
+                    if app_mode == "Day 1: Single Agent Mode":
+                        badge_html += f'<span class="agent-badge badge-{selected_agent_key}">{selected_agent_key} (Day 1 Mode)</span>'
+                    elif executed_agents:
                         for ag in executed_agents:
                             badge_cls = f"badge-{ag.split('_')[0]}"
                             badge_html += f'<span class="agent-badge {badge_cls}">{ag}</span>'
@@ -382,7 +419,7 @@ if prompt_to_send:
                     st.session_state.messages.append({"role": "assistant", "content": err_msg})
 
             except requests.exceptions.ConnectionError:
-                err_msg = "❌ Connection Error: Could not connect to API server at http://localhost:8000. Please start it using `python main.py`."
+                err_msg = "❌ Connection Error: Could not connect to API server at http://localhost:8000. Ensure `python main.py` is running."
                 st.error(err_msg)
                 st.session_state.messages.append({"role": "assistant", "content": err_msg})
             except Exception as exc:

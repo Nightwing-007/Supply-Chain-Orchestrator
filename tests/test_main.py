@@ -3,9 +3,11 @@ Tests for FastAPI REST API (main.py)
 
 Covers:
   1. GET /health endpoint returns 200 OK.
-  2. Test Case 1: Successful POST /api/workflow returns 200 OK and mocked GlobalLogisticsState response payload.
-  3. Test Case 2: Invalid or empty query payload returns 422 Unprocessable Entity validation error.
-  4. Test Case 3: Simulated internal orchestrator failure returns 500 Internal Server Error.
+  2. POST /api/workflow returns 200 OK with mocked GlobalLogisticsState payload (Day 2 Mode).
+  3. POST /api/workflow 422 Unprocessable Entity on validation error.
+  4. POST /api/workflow 500 Internal Server Error on orchestrator failure.
+  5. POST /api/agent/{agent_name} returns 200 OK with single agent state (Day 1 Mode).
+  6. POST /api/agent/{invalid_name} returns 404 Not Found.
 """
 
 from unittest.mock import AsyncMock, patch
@@ -37,7 +39,7 @@ async def test_health_check_endpoint():
 
 
 # =============================================================
-#  Test Case 1: Successful Workflow POST (200 OK)
+#  Test 2: Workflow POST (Day 2 Mode)
 # =============================================================
 
 @pytest.mark.asyncio
@@ -83,10 +85,6 @@ async def test_workflow_post_success(mock_run_workflow):
     )
 
 
-# =============================================================
-#  Test Case 2: Validation Error (422 Unprocessable Entity)
-# =============================================================
-
 @pytest.mark.asyncio
 async def test_workflow_post_invalid_empty_query():
     """POST /api/workflow with empty string query returns 422 Unprocessable Entity."""
@@ -112,10 +110,6 @@ async def test_workflow_post_missing_query_field():
         assert response.status_code == 422
 
 
-# =============================================================
-#  Test Case 3: Internal Orchestrator Failure (500 Internal Server Error)
-# =============================================================
-
 @pytest.mark.asyncio
 @patch("main.run_logistics_workflow", new_callable=AsyncMock)
 async def test_workflow_post_internal_error(mock_run_workflow):
@@ -134,3 +128,45 @@ async def test_workflow_post_internal_error(mock_run_workflow):
         data = response.json()
         assert "detail" in data
         assert "Database connection pool closed unexpectedly" in data["detail"]
+
+
+# =============================================================
+#  Test 3: Standalone Single Agent POST (Day 1 Mode)
+# =============================================================
+
+@pytest.mark.asyncio
+@patch("main.inventory_planning_agent", new_callable=AsyncMock)
+async def test_single_agent_post_success(mock_inventory_agent):
+    """POST /api/agent/inventory directly invokes the inventory agent and returns 200 OK."""
+    mock_inventory_agent.return_value = {
+        "inventory": {
+            "low_stock_alerts": [{"sku": "SKU-TEST-1", "quantity_on_hand": 2}],
+            "reorder_recommendations": [],
+        }
+    }
+
+    payload = {
+        "query": "Check low stock items",
+    }
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        response = await client.post("/api/agent/inventory", json=payload)
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "success"
+        assert "inventory" in data["state"]
+        assert data["state"]["target_agent"] == "FINISH"
+
+    mock_inventory_agent.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_single_agent_post_not_found():
+    """POST /api/agent/unknown_agent returns 404 Not Found."""
+    payload = {"query": "Check stuff"}
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        response = await client.post("/api/agent/unknown_agent", json=payload)
+        assert response.status_code == 404
+        assert "not found" in response.json()["detail"].lower()
