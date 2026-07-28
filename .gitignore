@@ -1,0 +1,38 @@
+# ──────────────────────────────────────────────
+# Supply Chain Orchestrator — Git Ignore Rules
+# ──────────────────────────────────────────────
+
+# ── Environment & Secret Keys ──
+.env
+.env.local
+.env.*.local
+*.env
+
+# ── Python & Virtual Environments ──
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ENV/
+env/
+
+# ── IDEs & Editors ──
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# ── Testing & Coverage ──
+.pytest_cache/
+.coverage
+htmlcov/
+.nox/
+.tox/
+
+# ── Database & Log files ──
+*.log
+*.sqlite3
+*.db
