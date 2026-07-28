@@ -36,3 +36,8 @@ htmlcov/
 *.log
 *.sqlite3
 *.db
+
+# ── Frontend ──
+ui/node_modules/
+ui/dist/
+ui/out.css
