@@ -1,71 +1,76 @@
-# Supply Chain Orchestrator 🚛
+# Supply Chain Orchestrator — CampusOS 🚛
 
-**Smart Logistics Multi-Agent System Powered by LangGraph, PostgreSQL, and Google Gemini**
+**Smart Logistics Multi-Agent System Powered by LangGraph, PostgreSQL, FastAPI & Google Gemini**
 
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-blue.svg)](https://www.python.org/)
 [![LangGraph](https://img.shields.io/badge/Orchestration-LangGraph-orange.svg)](https://github.com/langchain-ai/langgraph)
-[![PostgreSQL](https://img.shields.io/badge/Database-PostgreSQL-blue.svg)](https://www.postgresql.org/)
+[![PostgreSQL](https://img.shields.io/badge/Database-PostgreSQL%2014%2B-blue.svg)](https://www.postgresql.org/)
+[![FastAPI](https://img.shields.io/badge/API-FastAPI-green.svg)](https://fastapi.tiangolo.com/)
+[![Streamlit](https://img.shields.io/badge/Frontend-Streamlit-red.svg)](https://streamlit.io/)
 [![LLM API](https://img.shields.io/badge/LLM-Gemini%202.5%20Flash%20%7C%20GPT--4o--mini-green.svg)](https://ai.google.dev/)
 
 ---
 
 ## Executive Summary
 
-**Supply Chain Orchestrator** is an enterprise-grade, multi-agent logistics intelligence system designed to solve complex supply chain fragmentation. Built using Python, LangGraph, PostgreSQL, and Google Gemini API, the platform coordinates six specialised single AI agents that operate harmoniously across inventory planning, warehouse operations, demand forecasting, route optimisation, fleet management, and customer notifications.
+**Supply Chain Orchestrator** is an enterprise-grade, autonomous multi-agent logistics platform built for smart supply chain intelligence. Combining Python, LangGraph, PostgreSQL, FastAPI, Streamlit, and Google Gemini 2.5 Flash, the platform coordinates **6 specialised single AI agents** that operate harmoniously across inventory planning, warehouse operations, demand forecasting, route optimisation, fleet management, and customer communications.
 
-By combining deterministic algorithms (e.g., Cycle Sort, Nearest Neighbor TSP, Exponential Smoothing, PostgreSQL Window Functions) with cloud-based LLM reasoning, Supply Chain Orchestrator bridges operational silos into a self-correcting logistics engine.
-
----
-
-## The Problem
-
-Modern supply chain management suffers from systemic inefficiencies driven by data fragmentation and delayed decision-making:
-
-- **Siloed Domain Intelligence:** Inventory managers, warehouse dispatchers, and fleet operators rely on disconnected spreadsheets and legacy ERPs, leading to stockouts and capacity bottlenecks.
-- **Purely Reactive Planning:** Traditional systems lack predictive capability, failing to anticipate demand spikes or maintenance failures before they disrupt operations.
-- **Communication Gaps:** Customers remain uninformed during delivery disruptions because logistics status updates are detached from customer service channels.
-- **High Computational Overhead:** Local rule engines struggle to balance multi-variable trade-offs (e.g. traffic hazards vs SLA deadlines) in real time.
+By pairing deterministic domain algorithms (e.g., Cycle Sort, Nearest Neighbor TSP, Exponential Smoothing, PostgreSQL Window Functions, Haversine Distance) with cloud-based LLM reasoning, Supply Chain Orchestrator bridges operational silos into a self-correcting, real-time logistics engine.
 
 ---
 
-## The Solution
-
-**Supply Chain Orchestrator** introduces a modular, multi-agent architecture where dedicated single AI agents execute domain-specific tasks and communicate via a shared relational state store.
+## System Architecture: The 3-Phase Journey
 
 ```
-┌─────────────────────────────────────────────────────────────────────────────────┐
-│                          LANGGRAPH SUPERVISOR AGENT                              │
-└────────────────────────────────────────┬────────────────────────────────────────┘
-                                         │
- ┌───────────────────┬───────────────────┼───────────────────┬───────────────────┐
- │                   │                   │                   │                   │
- ▼                   ▼                   ▼                   ▼                   ▼
-┌──────────────┐   ┌──────────────┐   ┌──────────────┐   ┌──────────────┐   ┌──────────────┐   ┌──────────────┐
-│  Agent 1:    │   │  Agent 2:    │   │  Agent 3:    │   │  Agent 4:    │   │  Agent 5:    │   │  Agent 6:    │
-│ Inventory    │   │  Warehouse   │   │  Demand      │   │  Route       │   │  Fleet       │   │  Customer    │
-│ Planning     │   │  Operations  │   │  Forecasting │   │  Optimisation│   │  Management  │   │ Notification │
-└──────┬───────┘   └──────┬───────┘   └──────┬───────┘   └──────┬───────┘   └──────┬───────┘   └──────┬───────┘
-       │                  │                  │                  │                  │                  │
-       └──────────────────┴──────────────────┼──────────────────┴──────────────────┴──────────────────┘
-                                             ▼
-                        PostgreSQL Shared State Store (sco Schema)
-                                             ▲
-                                             │
-                        Google Gemini 2.5 Flash / GitHub Models
+                                  USER / JUDGE INTERFACE
+                                ┌────────────────────────┐
+                                │  Streamlit Dashboard   │
+                                │   (frontend/app.py)    │
+                                └───────────┬────────────┘
+                                            │ POST /api/workflow
+                                            ▼
+                                   FASTAPI REST SERVER
+                                ┌────────────────────────┐
+                                │       (main.py)        │
+                                └───────────┬────────────┘
+                                            │
+                                            ▼
+                               LANGGRAPH SUPERVISOR GRAPH
+                         ┌─────────────────────────────────────┐
+                         │      (orchestrator/supervisor.py)   │
+                         └──────────────────┬──────────────────┘
+                                            │
+       ┌───────────────────┬────────────────┼───────────────────┬───────────────────┐
+       │                   │                │                   │                   │
+       ▼                   ▼                ▼                   ▼                   ▼
+┌──────────────┐   ┌──────────────┐  ┌──────────────┐   ┌──────────────┐   ┌──────────────┐   ┌──────────────┐
+│  Agent 1:    │   │  Agent 2:    │  │  Agent 3:    │   │  Agent 4:    │   │  Agent 5:    │   │  Agent 6:    │
+│ Inventory    │   │  Warehouse   │  │  Demand      │   │  Route       │   │  Fleet       │   │  Customer    │
+│ Planning     │   │  Operations  │  │  Forecasting │   │  Optimisation│   │  Management  │   │ Notification │
+└──────┬───────┘   └──────┬───────┘  └──────┬───────┘   └──────┬───────┘   └──────┬───────┘   └──────┬───────┘
+       │                  │                 │                  │                  │                  │
+       └──────────────────┴─────────────────┼──────────────────┴──────────────────┴──────────────────┘
+                                            ▼
+                       PostgreSQL Shared State Store (sco Schema)
+                                            ▲
+                                            │
+                       Google Gemini 2.5 Flash / GitHub Models
 ```
 
-### Core Architecture Principles
+### Phase 1: Modular Single AI Agents (Day 1)
+Built **6 independent, stateless async Python agents** with strict JSON input/output contracts. Each agent executes a deterministic algorithmic core (handling heavy math and SQL queries) before invoking Google Gemini 2.5 Flash for qualitative reasoning. Every invocation includes a deterministic fallback mechanism and logs audit metrics to the `agent_task_log` table.
 
-1. **Hybrid Intelligence (Algorithmic + LLM):** Heavy data processing (distance matrices, rolling window aggregations, bin sorting) is executed deterministically in Python/SQL. The LLM is reserved for qualitative reasoning, context analysis, and natural language drafting.
-2. **Resilience & Graceful Degradation:** Every agent implements a deterministic fallback mechanism. If an LLM call times out or fails, the system automatically falls back to rule-based execution without halting the workflow.
-3. **Stateless Node Functions:** Each agent is designed as an asynchronous Python function accepting a `GlobalLogisticsState` snapshot and returning strict JSON partial state updates.
-4. **Cloud-Only LLM Inference:** All reasoning is offloaded to cloud APIs (Google Gemini 2.5 Flash as primary, GPT-4o-mini via GitHub Models as fallback), ensuring low local memory consumption.
+### Phase 2: LangGraph Supervisor Orchestrator & REST API (Day 2)
+Integrated all 6 agents into a **LangGraph StateGraph shared state network** managed by a central **Supervisor Routing Engine**. The supervisor analyzes the state, past execution history, and user query to dynamically route execution to the appropriate agents, looping iteratively (`Supervisor ──► Agent ──► Supervisor ──► FINISH`) until all tasks are complete. Exposed the orchestrator via a production-ready **FastAPI REST API** (`POST /api/workflow`) with connection pool lifespan hooks and OpenAPI documentation.
+
+### Phase 3: Streamlit UI & Live State Inspector (Day 3)
+Created a dark-mode, glassmorphism dashboard in **Streamlit** (`frontend/app.py`). Features a conversational chat interface with sample one-click demo triggers for judges, plus a **Real-Time Agent State Inspector sidebar** displaying visual metric cards and expandable JSON sub-states for all 6 agents.
 
 ---
 
 ## The 6 Specialised AI Agents
 
-| Agent | Core Role | Algorithmic Core | LLM Synergy & Reasoning |
+| Agent | Domain Role | Algorithmic Core | LLM Synergy & Reasoning |
 |---|---|---|---|
 | **1. Inventory Planning Agent** | Monitors stock levels across warehouses and generates reorder plans. | Low-stock deficit detection (`quantity_on_hand <= reorder_point`), 4-tier priority classification. | Generates structured **Reorder Plans** with restock quantities and justifications for low-stock items. |
 | **2. Warehouse Operations Agent** | Manages warehouse capacity, layout efficiency, and pick list ordering. | **Cycle Sort** algorithm by turnover frequency for minimal physical item moves; capacity thresholding (>85%). | Drafts **Warehouse Optimisation Plans** with space reallocation strategies and bottleneck warnings. |
@@ -76,38 +81,40 @@ Modern supply chain management suffers from systemic inefficiencies driven by da
 
 ---
 
-## Technical Stack
+## Tech Stack
 
-- **Core Runtime:** Python 3.11+ with full `async/await` execution
-- **Orchestration:** LangGraph (StateGraph shared state orchestration)
-- **Database:** PostgreSQL with `asyncpg` driver and connection pooling
+- **Core Language:** Python 3.11+ (Standard CPython) with full `async/await` execution
+- **Multi-Agent Orchestration:** LangGraph (`StateGraph` state graph & conditional routing)
+- **Database Layer:** PostgreSQL 14+ with `asyncpg` connection pooling
+- **REST API Framework:** FastAPI + Uvicorn with CORS middleware
+- **Frontend UI:** Streamlit (`frontend/app.py`) with custom dark CSS theme
 - **Primary LLM:** Google Gemini 2.5 Flash (via `google-genai` SDK)
 - **Fallback LLM:** GPT-4o-mini (via GitHub Models / Azure OpenAI endpoint)
-- **API Server:** FastAPI + Uvicorn
 - **Validation & Serialization:** Pydantic v2 & `pydantic-settings`
-- **Testing:** `pytest` + `pytest-asyncio`
+- **Testing:** `pytest` + `pytest-asyncio` + `httpx`
 
 ---
 
-## Project Structure
+## Repository Structure
 
 ```
 AgentVerse/
-├── README.md                       # Project overview & high-level architecture
-├── DEVELOPER.md                    # Step-by-step developer setup & execution guide
-├── requirements.txt                # Pinned Python dependencies
+├── README.md                       # Full 3-phase project architecture & showcase
+├── DEVELOPER.md                    # Detailed developer setup & execution guide
+├── .gitignore                      # Git ignore rule definitions (.env, .venv, etc.)
 ├── .env.example                    # Template for environment variables
-├── main.py                         # FastAPI web server and CLI entrypoint
+├── requirements.txt                # Pinned Python dependencies
+├── main.py                         # FastAPI server & CLI entrypoint
 │
 ├── config/
-│   └── settings.py                 # Pydantic-settings central configuration
+│   └── settings.py                 # Central Pydantic-settings configuration
 │
 ├── db/
-│   ├── schema.sql                  # PostgreSQL schema DDL (13 tables, enums, indexes)
-│   ├── seed.sql                    # Seed data (3 warehouses, 10 products, 5 vehicles, 3 orders)
-│   └── connection.py               # Singleton asyncpg connection pool & query helpers
+│   ├── schema.sql                  # PostgreSQL DDL (13 tables, enums, indexes)
+│   ├── seed.sql                    # Seed dataset (3 warehouses, 10 products, 5 vehicles, 3 orders)
+│   └── connection.py               # Singleton asyncpg connection pool & query execution
 │
-├── models/                         # Domain Pydantic models
+├── models/                         # Pydantic v2 domain schemas
 │   ├── inventory.py
 │   ├── warehouse.py
 │   ├── demand.py
@@ -125,20 +132,18 @@ AgentVerse/
 │
 ├── orchestrator/
 │   ├── state.py                    # GlobalLogisticsState TypedDict definition
-│   └── supervisor.py               # LangGraph supervisor routing logic
+│   └── supervisor.py               # LangGraph StateGraph Supervisor Orchestrator
 │
-└── tests/                          # Async unit test suite
+├── frontend/
+│   └── app.py                      # Streamlit UI & Live State Inspector Dashboard
+│
+└── tests/                          # Async unit test suite (35+ test cases)
     ├── test_inventory_agent.py
     ├── test_warehouse_agent.py
     ├── test_demand_agent.py
     ├── test_route_agent.py
     ├── test_fleet_agent.py
-    └── test_notification_agent.py
+    ├── test_notification_agent.py
+    ├── test_supervisor.py
+    └── test_main.py
 ```
-
----
-
-## Development Phasing
-
-- **Phase 1 (Day 1) — Complete:** Built all 6 modular agents as independent, stateless async Python functions with strict JSON input/output contracts, complete with unit tests and database audit logging.
-- **Phase 2 (Day 2) — In Progress:** LangGraph Supervisor Agent integration, state graph routing, and PostgreSQL state persistence.

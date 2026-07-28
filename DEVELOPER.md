@@ -1,18 +1,18 @@
 # Supply Chain Orchestrator — Developer Setup & Execution Guide
 
-This document provides step-by-step instructions for engineers to set up, configure, run, and test the **Supply Chain Orchestrator** multi-agent codebase locally.
+This guide provides technical instructions for software engineers to set up, configure, run, and test the **Supply Chain Orchestrator** multi-agent codebase locally.
 
 ---
 
 ## 1. Prerequisites
 
-Before starting, ensure your system has the following software installed:
+Ensure your development machine has the following software installed:
 
-- **Python 3.11 or higher**
-  > ⚠️ **Important Note on Python Distribution:**
-  > You **must** use standard CPython (downloaded from [python.org](https://www.python.org/downloads/) or installed via `pyenv` / `brew`).
-  > **Do not use MSYS2 / MinGW Python**, as `pydantic-core` requires Rust/maturin compilation under MSYS2, whereas standard CPython includes pre-built wheels.
-- **PostgreSQL 14 or higher** (running locally or accessible via network)
+- **Python 3.11 or 3.12 (Standard CPython)**
+  > ⚠️ **Critical Python Distribution Requirement:**  
+  > You **must** use standard CPython (downloaded from [python.org](https://www.python.org/downloads/) or installed via `py` launcher).  
+  > **Do not use MSYS2 / MinGW Python**, as packages with Rust/C extensions (such as `pydantic-core`, `uuid-utils`, `asyncpg`) do not have pre-compiled wheels for MSYS2 Python and will fail during installation.
+- **PostgreSQL 14 or higher** (running locally on port 5432)
 - **Git**
 
 ---
@@ -28,9 +28,15 @@ cd AgentVerse
 
 ### Step 2.2: Create and Activate a Virtual Environment
 
-**On Windows (PowerShell / Command Prompt):**
+**On Windows (PowerShell):**
 ```powershell
-python -m venv .venv
+# Create virtual environment using standard CPython launcher
+py -3.12 -m venv .venv
+
+# Allow script execution for current session if needed
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+
+# Activate virtual environment
 .\.venv\Scripts\activate
 ```
 
@@ -49,7 +55,7 @@ pip install -r requirements.txt
 
 Verify installation:
 ```bash
-python -c "import langgraph, google.genai, asyncpg, pydantic; print('Dependencies installed successfully!')"
+python -c "import langgraph, google.genai, asyncpg, pydantic, fastapi, streamlit; print('All dependencies installed successfully!')"
 ```
 
 ---
@@ -58,7 +64,7 @@ python -c "import langgraph, google.genai, asyncpg, pydantic; print('Dependencie
 
 Copy the example environment file to `.env`:
 
-**On Windows:**
+**On Windows (PowerShell):**
 ```powershell
 copy .env.example .env
 ```
@@ -68,11 +74,12 @@ copy .env.example .env
 cp .env.example .env
 ```
 
-Open `.env` in your code editor and configure the parameters:
+Edit `.env` and configure your credentials:
 
 ```ini
 # ── PostgreSQL ──────────────────────────────────────────────
-DATABASE_URL=postgresql://postgres:password@localhost:5432/supply_chain
+# Note: If your password contains special characters like '@', URL-encode them (e.g. '@' becomes '%40')
+DATABASE_URL=postgresql://postgres:your_password@localhost:5432/supply_chain
 
 # ── Google Gemini API ───────────────────────────────────────
 GOOGLE_API_KEY=your_actual_google_gemini_api_key
@@ -94,9 +101,9 @@ DB_POOL_MAX_SIZE=10
 
 ## 4. Database Initialization
 
-### Step 4.1: Create the Database
+### Step 4.1: Create Database
 
-Open a terminal or PostgreSQL client (`psql`) and create the database:
+Open `psql` or run via terminal:
 
 ```bash
 psql -U postgres -c "CREATE DATABASE supply_chain;"
@@ -104,14 +111,20 @@ psql -U postgres -c "CREATE DATABASE supply_chain;"
 
 ### Step 4.2: Apply Schema DDL & Seed Data
 
-Execute `db/schema.sql` to build the `sco` schema (13 tables, custom enums, and indexes), then execute `db/seed.sql` to insert initial test records:
-
-```bash
-# 1. Apply Schema DDL
+**Option A: From Terminal (PowerShell / Command Prompt)**
+```powershell
+# Apply DDL Schema
 psql -U postgres -d supply_chain -f db/schema.sql
 
-# 2. Populate Seed Data
+# Insert Seed Dataset
 psql -U postgres -d supply_chain -f db/seed.sql
+```
+
+**Option B: From inside the `psql` Interactive Prompt (`supply_chain=#`)**
+```sql
+\c supply_chain
+\i c:/Users/deepa/Downloads/AgentVerse/db/schema.sql
+\i c:/Users/deepa/Downloads/AgentVerse/db/seed.sql
 ```
 
 ### Step 4.3: Verify Database Tables
@@ -122,11 +135,11 @@ psql -U postgres -d supply_chain -c "SELECT table_name FROM information_schema.t
 
 Expected output:
 ```
-        table_name       
--------------------------
+       table_name
+------------------------
  warehouses
- products
  inventory
+ products
  inventory_transactions
  demand_forecasts
  orders
@@ -142,77 +155,82 @@ Expected output:
 
 ---
 
-## 5. Running the Application
+## 5. Running the Application (Dual-Terminal Setup)
 
-### Option A: Run via FastAPI Web Server
+To run the complete platform, open **two separate PowerShell terminals** in the `AgentVerse` directory:
 
-To start the FastAPI application with live hot-reloading:
+### Terminal 1: Launch FastAPI Backend Server
 
-```bash
+```powershell
+# 1. Activate virtual environment
+.\.venv\Scripts\activate
+
+# 2. Start FastAPI REST Server
 python main.py
 ```
+- **Backend API:** `http://localhost:8000`
+- **Swagger Interactive API Docs:** `http://localhost:8000/docs`
+- **Health Check Probe:** `http://localhost:8000/health`
 
-The server will start at `http://localhost:8000`. You can inspect endpoints and open interactive API docs at:
-- **Swagger UI:** [http://localhost:8000/docs](http://localhost:8000/docs)
-- **Health Probe:** [http://localhost:8000/health](http://localhost:8000/health)
+### Terminal 2: Launch Streamlit Dashboard Frontend
 
-### Option B: Run CLI Smoke Test
+```powershell
+# 1. Activate virtual environment
+.\.venv\Scripts\activate
 
-To verify database pool connectivity and system initialization without running a web server:
-
-```bash
-python main.py --cli
+# 2. Start Streamlit UI
+streamlit run frontend/app.py
 ```
-
-Expected CLI output:
-```
-10:00:00 │ sco.main                     │ INFO    │ Running in CLI mode…
-10:00:00 │ db.connection                │ INFO    │ Creating asyncpg connection pool → postgresql://...
-10:00:00 │ db.connection                │ INFO    │ Connection pool created (min=2, max=10)
-10:00:00 │ sco.main                     │ INFO    │ Connected to PostgreSQL: PostgreSQL 16.1 ...
-10:00:00 │ db.connection                │ INFO    │ Connection pool closed.
-10:00:00 │ sco.main                     │ INFO    │ CLI smoke test passed ✅
-```
+- **Frontend Dashboard:** `http://localhost:8501`
 
 ---
 
-## 6. Running the Test Suite
+## 6. Running the Unit Test Suite
 
-The test suite uses `pytest` and `pytest-asyncio` with mocked database connections (`asyncpg`) and mocked LLM responses (`LLMService`).
+The project includes unit tests for all 6 agents, the LangGraph supervisor, and the FastAPI endpoints.
 
-### Run All Unit Tests
+```powershell
+# Activate environment
+.\.venv\Scripts\activate
 
-```bash
+# Run all test suites
 pytest tests/ -v
 ```
 
-### Run Tests for a Specific Agent
+### Run Tests for Specific Components
 
-```bash
-# Test Agent 1: Inventory Planning Agent
+```powershell
+# 1. Test Agents
 pytest tests/test_inventory_agent.py -v
-
-# Test Agent 2: Warehouse Operations Agent
 pytest tests/test_warehouse_agent.py -v
-
-# Test Agent 3: Demand Forecasting Agent
 pytest tests/test_demand_agent.py -v
-
-# Test Agent 4: Route Optimization Agent
 pytest tests/test_route_agent.py -v
-
-# Test Agent 5: Fleet Management Agent
 pytest tests/test_fleet_agent.py -v
-
-# Test Agent 6: Customer Notification Agent
 pytest tests/test_notification_agent.py -v
+
+# 2. Test LangGraph Supervisor Orchestrator
+pytest tests/test_supervisor.py -v
+
+# 3. Test FastAPI REST API
+pytest tests/test_main.py -v
 ```
 
 ---
 
-## 7. Development Guidelines
+## 7. CLI Smoke Test Mode
 
-1. **Async Safety:** Always use `async/await` when writing database or LLM calls. Never invoke blocking synchronous I/O on event loops.
-2. **LLM Fallbacks:** Every new agent function must implement a deterministic fallback path in case `llm_service.generate()` raises an exception.
-3. **Task Logging:** Audit every agent execution by writing an entry to the `sco.agent_task_log` table using `execute_command`.
-4. **Data Validation:** Define Pydantic models in `models/` for any new domain entities, ensuring `from_attributes = True` is set.
+To verify database pool connectivity and system initialization without starting the web server:
+
+```powershell
+python main.py --cli
+```
+
+Expected output:
+```
+09:43:43 │ sco.main     │ INFO │ Running in CLI mode…
+09:43:43 │ db.connection │ INFO │ Creating asyncpg connection pool → postgresql://...
+09:43:43 │ db.connection │ INFO │ Connection pool created (min=2, max=10)
+09:43:43 │ sco.main     │ INFO │ Connected to PostgreSQL: PostgreSQL 18.4...
+09:43:43 │ db.connection │ INFO │ Connection pool closed.
+09:43:43 │ sco.main     │ INFO │ CLI smoke test passed ✅
+```
