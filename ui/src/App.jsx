@@ -1,312 +1,284 @@
-import { useState, useRef, useEffect, useCallback } from "react";
-import {
-  Sun, Moon, Send, Truck, Package, Warehouse as WarehouseIcon,
-  TrendingUp, Route, CircleGauge, Bell, Bot, User, Zap,
-  ChevronDown, ChevronRight, Activity, Check
-} from "lucide-react";
-import { runWorkflow, runSingleAgent, checkHealth } from "./api";
-
-const AGENTS = [
-  { key: "inventory",    label: "Inventory Planning",    icon: Package },
-  { key: "warehouse",    label: "Warehouse Operations",  icon: WarehouseIcon },
-  { key: "demand",       label: "Demand Forecasting",    icon: TrendingUp },
-  { key: "route",        label: "Route Optimization",    icon: Route },
-  { key: "fleet",        label: "Fleet Management",      icon: CircleGauge },
-  { key: "notification", label: "Customer Notification", icon: Bell },
-];
-
-const DEMO_PROMPTS = [
-  { label: "📦 Stock Check",     query: "Check stock levels across all warehouses and generate reorder recommendations." },
-  { label: "🏬 Warehouse Ops",   query: "Inspect warehouse utilization and build an optimized pick list." },
-  { label: "🛣️ Route Dispatch",  query: "Optimize delivery routes considering current traffic hazards." },
-  { label: "🌐 Full Supervisor", query: "Check stock, inspect warehouse capacity, optimize routes, and check fleet health." },
-];
-
-const fmtMs = (ms) => (ms >= 1000 ? `${(ms / 1000).toFixed(1)}s` : `${Math.round(ms)}ms`);
+import { useState, useEffect, useRef } from "react";
+import { Search, Moon, Sun, ArrowRight, MessageSquare, Send, AlertTriangle, Package, Activity } from "lucide-react";
 
 export default function App() {
-  const [theme, setTheme]             = useState("dark");
-  const [mode, setMode]               = useState("day2");
-  const [selectedAgent, setAgent]     = useState("inventory");
-  const [messages, setMessages]       = useState([
-    {
-      role: "assistant",
-      text: "👋 Welcome to the **Supply Chain Orchestrator**.\n\nChoose **Day 1** (single agent) or **Day 2** (multi-agent supervisor) in the sidebar, then type a query or click a demo prompt!",
-      agents: ["supervisor"],
-      elapsed: 120,
-    },
-  ]);
-  const [input, setInput]             = useState("");
-  const [loading, setLoading]         = useState(false);
-  const [globalState, setGlobalState] = useState({});
-  const [apiOnline, setApiOnline]     = useState(null);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [isDark, setIsDark] = useState(true);
+  const [activeTab, setActiveTab] = useState("Dashboard");
+  const [messages, setMessages] = useState([]);
+  const [isTyping, setIsTyping] = useState(false);
+  const [chatInput, setChatInput] = useState("");
   const chatEndRef = useRef(null);
 
-  const isDark = theme === "dark";
+  useEffect(() => {
+    const root = document.documentElement;
+    if (isDark) root.classList.add("dark");
+    else root.classList.remove("dark");
+  }, [isDark]);
 
   useEffect(() => {
-    checkHealth().then(() => setApiOnline(true)).catch(() => setApiOnline(false));
-    const interval = setInterval(() => {
-      checkHealth().then(() => setApiOnline(true)).catch(() => setApiOnline(false));
-    }, 15_000);
-    return () => clearInterval(interval);
-  }, []);
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, isTyping]);
 
-  useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
+  const handleSend = (e) => {
+    e.preventDefault();
+    if (!chatInput.trim()) return;
+    
+    setMessages(prev => [...prev, { role: 'user', content: chatInput }]);
+    setChatInput('');
+    setIsTyping(true);
 
-  const handleSubmit = useCallback(async (overrideQuery) => {
-    const query = overrideQuery || input.trim();
-    if (!query || loading) return;
-    setInput("");
-    setMessages((prev) => [...prev, { role: "user", text: query }]);
-    setLoading(true);
+    setTimeout(() => {
+      setIsTyping(false);
+      setMessages(prev => [...prev, { role: 'bot', content: `Analyzing your request regarding the ${activeTab} view...` }]);
+    }, 1500);
+  };
 
-    try {
-      const t0 = performance.now();
-      let res;
-      if (mode === "day1") {
-        res = await runSingleAgent(selectedAgent, query, globalState);
-      } else {
-        res = await runWorkflow(query);
-      }
-      const elapsed = performance.now() - t0;
+  const renderDashboard = () => (
+    <>
+      <header className="mb-16">
+        <h1 className="text-4xl font-light tracking-tight mb-2">Live Telemetry</h1>
+        <p className="text-text-secondary">Monitoring global supply chain metrics.</p>
+      </header>
 
-      const state = res.state || {};
-      setGlobalState(state);
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-x-16 gap-y-16">
+        <section className="xl:col-span-2">
+          <div className="flex items-end justify-between mb-4 border-b border-border-panel pb-3">
+            <h2 className="text-sm font-medium tracking-wide text-text-secondary uppercase">Route Tracking</h2>
+            <span className="text-xs font-mono text-text-secondary">AWAITING_DATA</span>
+          </div>
+          <div className="h-[400px] w-full flex flex-col items-center justify-center text-text-secondary bg-border-panel/30">
+            <span className="text-sm">Map Visualization Slot</span>
+          </div>
+        </section>
 
-      const agents = (state.agent_responses || [])
-        .map((r) => r.agent)
-        .filter((a) => a && a !== "supervisor");
+        <section>
+          <div className="flex items-end justify-between mb-4 border-b border-border-panel pb-3">
+            <h2 className="text-sm font-medium tracking-wide text-text-secondary uppercase">Performance</h2>
+            <span className="text-xs text-text-secondary">Last 7 Days</span>
+          </div>
+          <div className="h-48 w-full flex items-end gap-[2px] bg-border-panel/10 p-4">
+            {[40, 60, 45, 80, 50, 90, 75].map((h, i) => (
+              <div key={i} className="flex-1 bg-border-panel hover:bg-text-primary transition-colors" style={{ height: `${h}%` }} />
+            ))}
+          </div>
+        </section>
 
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "assistant",
-          text: res.final_answer || "Agent executed successfully.",
-          agents: mode === "day1" ? [selectedAgent] : agents,
-          elapsed,
-          mode,
-        },
-      ]);
-    } catch (err) {
-      // Handle "API Offline" State as requested
-      setMessages((prev) => [...prev, { role: "assistant", text: "⚠️ API Offline: Cannot connect to the Supply Chain Orchestrator.", isError: true }]);
-    } finally {
-      setLoading(false);
-    }
-  }, [input, loading, mode, selectedAgent, globalState]);
+        <section>
+          <div className="flex items-end justify-between mb-4 border-b border-border-panel pb-3">
+            <h2 className="text-sm font-medium tracking-wide text-text-secondary uppercase">Flow Graph</h2>
+            <button className="text-xs text-text-primary hover:underline uppercase tracking-wider font-medium">Interact</button>
+          </div>
+          <div className="h-48 w-full flex flex-col items-center justify-center text-text-secondary bg-border-panel/30">
+            <span className="text-sm">Node-Link Graph Slot</span>
+          </div>
+        </section>
+      </div>
+    </>
+  );
 
-  const globalLayout = `h-screen w-full flex overflow-hidden font-sans transition-colors duration-300 ${isDark ? "bg-brand-dark text-brand-light" : "bg-brand-light text-brand-dark"}`;
-  const secondaryBg = isDark ? "bg-brand-gray/20" : "bg-white/60";
+  const renderShipments = () => (
+    <>
+      <header className="mb-16">
+        <h1 className="text-4xl font-light tracking-tight mb-2">Active Shipments</h1>
+        <p className="text-text-secondary">Tracking 1,284 ongoing freight movements.</p>
+      </header>
+
+      <div className="w-full">
+        <div className="grid grid-cols-5 border-b border-border-panel pb-4 mb-4 text-xs font-medium tracking-widest text-text-secondary uppercase">
+          <div className="col-span-2">Shipment ID</div>
+          <div>Origin</div>
+          <div>Destination</div>
+          <div className="text-right">Status</div>
+        </div>
+        <div className="space-y-2">
+          {[1, 2, 3, 4, 5].map((item) => (
+            <div key={item} className="grid grid-cols-5 items-center border-b border-border-panel/50 pb-4 pt-2 text-sm">
+              <div className="col-span-2 flex items-center gap-3">
+                <Package size={16} className="text-text-secondary" />
+                <span className="font-mono">SHP-293{item}4X</span>
+              </div>
+              <div className="text-text-secondary">Shanghai, CN</div>
+              <div className="text-text-secondary">Rotterdam, NL</div>
+              <div className="text-right flex items-center justify-end gap-2 text-accent-primary">
+                <Activity size={14} />
+                <span>In Transit</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </>
+  );
+
+  const renderRisks = () => (
+    <>
+      <header className="mb-16">
+        <h1 className="text-4xl font-light tracking-tight mb-2">Risk Intel</h1>
+        <p className="text-text-secondary">Automated vulnerability and disruption tracking.</p>
+      </header>
+
+      <div className="space-y-6">
+        {[
+          { level: 'Critical', text: 'Port Congestion at Long Beach expected to delay 4 inbound vessels by 72h.', icon: AlertTriangle, color: 'text-accent-critical', bg: 'bg-accent-critical/10', border: 'border-accent-critical/20' },
+          { level: 'Warning', text: 'Typhoon approaching South China Sea, potential rerouting for 12 shipments.', icon: AlertTriangle, color: 'text-accent-warning', bg: 'bg-accent-warning/10', border: 'border-accent-warning/20' }
+        ].map((risk, i) => (
+          <div key={i} className={`p-6 border ${risk.border} ${risk.bg} flex items-start gap-4`}>
+            <risk.icon size={20} className={risk.color} />
+            <div>
+              <h3 className={`text-sm font-medium uppercase tracking-wider mb-2 ${risk.color}`}>{risk.level}</h3>
+              <p className="text-sm font-light leading-relaxed">{risk.text}</p>
+              <div className="mt-4 flex gap-4">
+                <button className={`text-xs uppercase tracking-widest font-medium ${risk.color} hover:opacity-70 transition-opacity`}>Mitigate</button>
+                <button className="text-xs uppercase tracking-widest font-medium text-text-secondary hover:text-text-primary transition-colors">Details</button>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </>
+  );
 
   return (
-    <div className={globalLayout}>
-      {/* ════════════  SIDEBAR  ════════════ */}
-      <aside className={`${sidebarOpen ? "w-80" : "w-0 overflow-hidden"} flex-shrink-0 border-r border-brand-gray flex flex-col transition-all duration-300 z-20`}>
-        <div className="p-6 flex-1 overflow-y-auto flex flex-col gap-4">
-
-          {/* Branding Header */}
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-brand-green flex items-center justify-center text-black font-bold shadow">
-              <Truck size={22} />
-            </div>
-            <div>
-              <h1 className="text-lg font-extrabold tracking-tight">SCO Dashboard</h1>
-              <div className="flex items-center gap-1.5 text-xs font-medium opacity-70">
-                <span className={`w-2 h-2 rounded-full ${apiOnline ? "bg-brand-green animate-pulse-glow" : "bg-red-500"}`} />
-                {apiOnline === true ? "API Connected" : apiOnline === false ? "API Offline" : "Checking..."}
+    <div className="h-screen w-full flex bg-bg-base text-text-primary font-sans font-light overflow-hidden">
+      
+      {/* LEFT COLUMN: MAIN STAGE */}
+      <div className="flex-1 flex flex-col min-w-0 border-r border-border-panel">
+        
+        {/* Strictly Aligned Header */}
+        <header className="h-20 px-16 flex items-center justify-between shrink-0 border-b border-border-panel">
+          <div className="flex items-center gap-16">
+            <div className="flex items-center gap-4 cursor-pointer group">
+              <div className="w-5 h-5 bg-text-primary flex items-center justify-center group-hover:bg-accent-primary transition-colors">
+                <div className="w-1.5 h-1.5 bg-bg-base"></div>
               </div>
+              <span className="font-medium tracking-tight text-lg">Orchestrator</span>
             </div>
-          </div>
-
-          {/* Theme Toggle */}
-          <div className={`flex rounded-xl p-1 border border-brand-gray ${secondaryBg}`}>
-            <button onClick={() => setTheme("light")}
-              className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-semibold transition ${!isDark ? "bg-brand-green text-black" : "opacity-60 hover:opacity-100"}`}>
-              <Sun size={14} /> Light
-            </button>
-            <button onClick={() => setTheme("dark")}
-              className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-semibold transition ${isDark ? "bg-brand-green text-black" : "opacity-60 hover:opacity-100"}`}>
-              <Moon size={14} /> Dark
-            </button>
-          </div>
-
-          {/* Orchestration Mode */}
-          <div className="flex flex-col gap-2">
-            <span className="text-xs font-bold uppercase tracking-wider opacity-60">Orchestration Mode</span>
-            <div className={`flex rounded-xl p-1 border border-brand-gray ${secondaryBg}`}>
-              <button onClick={() => setMode("day1")}
-                className={`flex-1 py-2 rounded-lg text-xs font-semibold transition ${mode === "day1" ? "bg-brand-green text-black" : "opacity-60 hover:opacity-100"}`}>
-                Day 1
-              </button>
-              <button onClick={() => setMode("day2")}
-                className={`flex-1 py-2 rounded-lg text-xs font-semibold transition ${mode === "day2" ? "bg-brand-green text-black" : "opacity-60 hover:opacity-100"}`}>
-                Day 2
-              </button>
-            </div>
-          </div>
-
-          {/* Target Agent Selector */}
-          {mode === "day1" && (
-            <div className="flex flex-col gap-2 animate-fade-in">
-              <span className="text-xs font-bold uppercase tracking-wider opacity-60">Target Agent</span>
-              <div className="flex flex-col gap-2">
-                {AGENTS.map((a) => {
-                  const Icon = a.icon;
-                  const selected = selectedAgent === a.key;
-                  return (
-                    <button key={a.key} onClick={() => setAgent(a.key)}
-                      className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs transition border ${selected ? "bg-brand-green text-black border-brand-green font-bold" : `border-brand-gray ${secondaryBg} hover:border-brand-green`}`}>
-                      <Icon size={16} />
-                      <span>{a.label}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          <div className="border-t border-brand-gray my-2" />
-
-          {/* Live Metrics Grid */}
-          <div className="flex flex-col gap-2">
-            <span className="text-xs font-bold uppercase tracking-wider opacity-60">Live Metrics</span>
-            <div className="grid grid-cols-2 gap-4">
-              <MetricCard label="Low Stock"  value={((globalState.inventory || {}).low_stock_alerts || []).length} isDark={isDark} />
-              <MetricCard label="WH Util"    value={`${(globalState.warehouse || {}).utilization_pct || 0}%`} isDark={isDark} />
-              <MetricCard label="Route Dist" value={`${(globalState.route || {}).total_distance_km || 0} km`} isDark={isDark} />
-              <MetricCard label="Fleet Util" value={`${(globalState.fleet || {})._fleet_utilization_pct || 0}%`} isDark={isDark} />
-            </div>
-          </div>
-
-          <div className="border-t border-brand-gray my-2" />
-
-          {/* State Inspector */}
-          <div className="flex flex-col gap-2">
-            <span className="text-xs font-bold uppercase tracking-wider opacity-60">State Inspector</span>
-            <div className="flex flex-col gap-2">
-              {["inventory", "warehouse", "demand", "route", "fleet", "notification"].map((key) => (
-                <StateExpander key={key} label={key} data={globalState[key]} isDark={isDark} />
+            
+            <nav className="hidden md:flex gap-10 text-sm">
+              {['Dashboard', 'Shipments', 'Risks'].map((tab) => (
+                <div key={tab} onClick={() => setActiveTab(tab)} className="relative cursor-pointer group h-20 flex items-center">
+                  <span className={`transition-colors ${activeTab === tab ? 'text-text-primary font-medium' : 'text-text-secondary group-hover:text-text-primary'}`}>
+                    {tab}
+                  </span>
+                  {activeTab === tab && (
+                    <div className="absolute bottom-0 left-0 w-full h-[2px] bg-text-primary"></div>
+                  )}
+                </div>
               ))}
-            </div>
+            </nav>
           </div>
-        </div>
-      </aside>
-
-      {/* ════════════  MAIN PANEL  ════════════ */}
-      <main className="flex-1 flex flex-col min-w-0">
-
-        {/* Header */}
-        <header className="px-6 py-4 border-b border-brand-gray flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-3">
-            <button onClick={() => setSidebarOpen((o) => !o)}
-              className={`p-2 rounded-xl border border-brand-gray hover:opacity-80 transition ${secondaryBg}`}>
-              {sidebarOpen ? <ChevronRight size={18} /> : <ChevronDown size={18} />}
+          
+          <div className="flex items-center gap-8 text-text-secondary">
+            <div className="hidden sm:flex items-center gap-3 cursor-pointer hover:text-text-primary transition-colors">
+              <Search size={16} />
+              <span className="text-sm">Search</span>
+              <span className="text-xs font-mono opacity-50">⌘K</span>
+            </div>
+            <button onClick={() => setIsDark(!isDark)} className="hover:text-text-primary transition-colors cursor-pointer">
+              {isDark ? <Sun size={16} /> : <Moon size={16} />}
             </button>
-            <div>
-              <h1 className="text-base font-bold tracking-tight">Supply Chain Orchestrator</h1>
+            <div className="w-8 h-8 bg-border-panel flex items-center justify-center cursor-pointer hover:opacity-80 transition-opacity ml-2">
+              <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix&backgroundColor=transparent" alt="User" className="w-full h-full opacity-80" />
             </div>
           </div>
         </header>
 
-        {/* Chat History Area */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
-          {messages.map((msg, i) => (
-            <ChatBubble key={i} msg={msg} isDark={isDark} />
-          ))}
-          {loading && (
-            <div className="flex items-start gap-3 animate-fade-in">
-              <div className="w-10 h-10 rounded-2xl border border-brand-green flex items-center justify-center text-brand-green shrink-0">
-                <Bot size={20} className="animate-pulse" />
+        {/* Content Area - Exact padding match with header */}
+        <main className="flex-1 overflow-y-auto px-16 py-12">
+          {activeTab === "Dashboard" && renderDashboard()}
+          {activeTab === "Shipments" && renderShipments()}
+          {activeTab === "Risks" && renderRisks()}
+        </main>
+      </div>
+
+      {/* RIGHT COLUMN: COPILOT - Fixed width, strictly aligned padding */}
+      <aside className="w-[420px] flex flex-col shrink-0 bg-bg-base">
+        
+        <div className="h-20 px-10 flex items-center shrink-0 border-b border-border-panel">
+          <span className="text-sm font-medium tracking-tight">Copilot</span>
+        </div>
+
+        <div className="flex-1 flex flex-col overflow-hidden">
+          
+          <div className="px-10 py-8 border-b border-border-panel shrink-0 bg-border-panel/10">
+            <h3 className="text-xs font-medium text-text-secondary uppercase tracking-widest mb-8">Risk Summary</h3>
+            <div className="grid grid-cols-2 gap-8">
+              <div>
+                <div className="text-4xl font-light text-accent-critical mb-2">--</div>
+                <div className="text-xs text-text-secondary uppercase tracking-wider">Critical</div>
               </div>
-              <div className={`p-4 rounded-2xl border border-brand-gray ${secondaryBg}`}>
-                <span className="text-xs font-semibold text-brand-green">Executing...</span>
+              <div>
+                <div className="text-4xl font-light text-accent-warning mb-2">--</div>
+                <div className="text-xs text-text-secondary uppercase tracking-wider">Warnings</div>
               </div>
             </div>
-          )}
-          <div ref={chatEndRef} />
+          </div>
+
+          <div className="flex-1 overflow-y-auto px-10 py-8 flex flex-col gap-6 text-sm">
+            {messages.length === 0 ? (
+              <div className="flex-1 flex flex-col justify-end text-text-secondary">
+                <div className="space-y-5 w-full">
+                  {['Analyze performance', 'Identify bottlenecks', 'Show critical alerts'].map((action) => (
+                    <div key={action} onClick={() => setChatInput(action)} className="flex items-center gap-4 cursor-pointer hover:text-text-primary transition-colors group pb-2 border-b border-transparent hover:border-border-panel">
+                      <ArrowRight size={14} className="opacity-0 group-hover:opacity-100 transition-opacity text-text-primary" />
+                      <span className="text-sm font-light">{action}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <>
+                {messages.map((msg, i) => (
+                  <div key={i} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'} gap-2`}>
+                    <div className="text-[10px] font-medium uppercase tracking-widest text-text-secondary">
+                      {msg.role === 'user' ? 'You' : 'Copilot'}
+                    </div>
+                    <div className={`p-4 max-w-[90%] font-light leading-relaxed border ${
+                      msg.role === 'user' 
+                        ? 'border-text-primary bg-text-primary text-bg-base' 
+                        : 'border-border-panel bg-border-panel/30 text-text-primary'
+                    }`}>
+                      {msg.content}
+                    </div>
+                  </div>
+                ))}
+                {isTyping && (
+                  <div className="flex flex-col items-start gap-2">
+                    <div className="text-[10px] font-medium uppercase tracking-widest text-text-secondary">Copilot</div>
+                    <div className="px-5 py-4 border border-border-panel bg-border-panel/30 flex items-center gap-2">
+                      <div className="w-1 h-1 bg-text-secondary animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                      <div className="w-1 h-1 bg-text-secondary animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                      <div className="w-1 h-1 bg-text-secondary animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                    </div>
+                  </div>
+                )}
+                <div ref={chatEndRef} />
+              </>
+            )}
+          </div>
+
+          <div className="px-10 py-6 shrink-0 border-t border-border-panel">
+            <form onSubmit={handleSend} className="relative flex items-center">
+              <input
+                type="text"
+                value={chatInput}
+                onChange={(e) => setChatInput(e.target.value)}
+                placeholder="Ask Copilot..."
+                className="w-full bg-transparent text-sm focus:outline-none placeholder:text-text-placeholder pr-8 border-b border-border-panel focus:border-text-primary transition-colors py-3"
+              />
+              <button
+                type="submit"
+                disabled={!chatInput.trim()}
+                className="absolute right-0 text-text-secondary hover:text-text-primary disabled:opacity-0 transition-colors cursor-pointer"
+              >
+                <Send size={16} />
+              </button>
+            </form>
+          </div>
+
         </div>
+      </aside>
 
-        {/* Input Bar */}
-        <div className="p-6 border-t border-brand-gray shrink-0">
-          <form onSubmit={(e) => { e.preventDefault(); handleSubmit(); }}
-            className={`flex items-center gap-4 rounded-full border border-brand-gray p-2 pl-6 transition focus-within:border-brand-green ${secondaryBg}`}>
-            <input
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder="Ask the orchestrator..."
-              disabled={loading}
-              className="flex-1 bg-transparent text-sm focus:outline-none disabled:opacity-50"
-            />
-            <button type="submit" disabled={loading || !input.trim()}
-              className="p-3 rounded-full bg-brand-green text-black font-bold hover:opacity-80 transition disabled:opacity-40 shadow shrink-0">
-              <Send size={18} />
-            </button>
-          </form>
-        </div>
-      </main>
-    </div>
-  );
-}
-
-function MetricCard({ label, value, isDark }) {
-  const secondaryBg = isDark ? "bg-brand-gray/20" : "bg-white/60";
-  return (
-    <div className={`rounded-xl border border-brand-gray p-4 text-center ${secondaryBg}`}>
-      <div className="text-2xl font-extrabold text-brand-green">{value}</div>
-      <div className="text-[0.65rem] uppercase tracking-wider font-bold opacity-60 mt-1">{label}</div>
-    </div>
-  );
-}
-
-function StateExpander({ label, data, isDark }) {
-  const [open, setOpen] = useState(false);
-  const secondaryBg = isDark ? "bg-brand-gray/20" : "bg-white/60";
-
-  return (
-    <div className={`rounded-xl border border-brand-gray overflow-hidden ${secondaryBg}`}>
-      <button onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between px-4 py-3 text-xs font-semibold hover:opacity-80 transition">
-        <span>{label.toUpperCase()}</span>
-        <ChevronDown size={16} className={`transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
-      </button>
-      {open && (
-        <div className="px-4 py-3 text-xs border-t border-brand-gray max-h-52 overflow-y-auto">
-          {data ? (
-            <pre className="whitespace-pre-wrap break-words font-mono text-[0.7rem]">
-              {JSON.stringify(data, null, 2)}
-            </pre>
-          ) : (
-            <p className="italic opacity-60">No data</p>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function ChatBubble({ msg, isDark }) {
-  const isUser = msg.role === "user";
-  const secondaryBg = isDark ? "bg-brand-gray/20" : "bg-white/60";
-
-  return (
-    <div className={`flex items-start gap-3 animate-fade-in ${isUser ? "flex-row-reverse" : ""}`}>
-      <div className={`w-9 h-9 rounded-2xl flex items-center justify-center shrink-0 font-bold ${
-        isUser ? "bg-brand-green text-black" : "border border-brand-green text-brand-green"
-      }`}>
-        {isUser ? <User size={18} /> : <Bot size={18} />}
-      </div>
-      <div className={`max-w-[78%] rounded-2xl p-4 text-sm leading-relaxed ${
-        isUser
-          ? "bg-brand-green text-black rounded-tr-sm"
-          : `${msg.isError ? "border-red-500 text-red-400" : "border-brand-gray"} border ${secondaryBg} rounded-tl-sm`
-      }`}>
-        <div className="whitespace-pre-wrap">
-          {msg.text}
-        </div>
-      </div>
     </div>
   );
 }
