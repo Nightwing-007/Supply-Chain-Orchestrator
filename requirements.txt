@@ -1,0 +1,32 @@
+# ──────────────────────────────────────────────
+# Supply Chain Orchestrator — Python Dependencies
+# ──────────────────────────────────────────────
+
+# ── Core Framework ──
+langgraph>=0.4.0
+langchain-core>=0.3.0
+langchain-google-genai>=2.1.0
+
+# ── LLM Providers ──
+google-genai>=1.14.0
+openai>=1.82.0                     # Used for GitHub Models (Azure-compatible endpoint)
+
+# ── Database (Async PostgreSQL) ──
+asyncpg>=0.30.0
+sqlalchemy[asyncio]>=2.0.40
+
+# ── Data Validation ──
+pydantic>=2.11.0
+pydantic-settings>=2.9.0
+
+# ── API Server ──
+fastapi>=0.115.0
+uvicorn[standard]>=0.34.0
+
+# ── Utilities ──
+python-dotenv>=1.1.0
+httpx>=0.28.0
+
+# ── Testing ──
+pytest>=8.3.0
+pytest-asyncio>=1.0.0
