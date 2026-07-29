@@ -3,8 +3,8 @@ Supply Chain Orchestrator — Application Entrypoint & REST API
 
 Provides:
   • FastAPI server with REST endpoints for multi-agent workflow invocation
-  • Standalone Single-Agent REST endpoints (Day 1 Mode: POST /api/agent/{agent_name})
-  • LangGraph Supervisor Orchestrator REST endpoint (Day 2 Mode: POST /api/workflow)
+  • Standalone Single-Agent REST endpoints (Single Agent Mode: POST /api/agent/{agent_name})
+  • LangGraph Supervisor Orchestrator REST endpoint (Multi Agent Mode: POST /api/workflow)
   • CORS middleware for frontend/dashboard integration
   • Lifespan context manager managing the PostgreSQL asyncpg connection pool
   • GET /health -- Service liveness probe
@@ -47,7 +47,7 @@ logging.basicConfig(
 logger = logging.getLogger("sco.main")
 
 
-# ── Standalone Agent Resolver (Day 1 Mode) ───────────────────
+# ── Standalone Agent Resolver (Single Agent Mode) ───────────────────
 
 def get_single_agent_fn(agent_name: str) -> Optional[Callable]:
     """
@@ -86,7 +86,7 @@ def get_single_agent_fn(agent_name: str) -> Optional[Callable]:
 # ── Pydantic Request & Response Schemas ──────────────────────
 
 class WorkflowRequest(BaseModel):
-    """Request payload for starting a multi-agent logistics workflow (Day 2)."""
+    """Request payload for starting a multi-agent logistics workflow (Multi Agent Mode)."""
 
     query: str = Field(
         ...,
@@ -102,7 +102,7 @@ class WorkflowRequest(BaseModel):
 
 
 class SingleAgentRequest(BaseModel):
-    """Request payload for executing a standalone single AI agent (Day 1)."""
+    """Request payload for executing a standalone single AI agent (Single Agent Mode)."""
 
     query: Optional[str] = Field(
         "Execute agent task",
@@ -162,11 +162,84 @@ async def health_check():
     return {"status": "ok", "service": "supply-chain-orchestrator"}
 
 
+
+@app.get("/api/dashboard", tags=["System"])
+async def get_dashboard_data():
+    """Fetch live metrics from PostgreSQL for the frontend dashboard."""
+    try:
+        pool = await get_pool()
+        async with pool.acquire() as conn:
+            # 1. Active Shipments
+            shipments_records = await conn.fetch("""
+                SELECT s.tracking_number, s.status, o.delivery_city as destination, 'Origin Warehouse' as origin
+                FROM shipments s
+                JOIN orders o ON s.order_id = o.id
+                WHERE s.status != 'delivered'
+                ORDER BY s.created_at DESC
+                LIMIT 5
+            """)
+            shipments = [dict(r) for r in shipments_records]
+
+            # 2. Performance Data (Mocked from DB for now as example)
+            performance = [
+                {'name': 'Mon', 'value': 40},
+                {'name': 'Tue', 'value': 60},
+                {'name': 'Wed', 'value': 45},
+                {'name': 'Thu', 'value': 80},
+                {'name': 'Fri', 'value': 50},
+                {'name': 'Sat', 'value': 90},
+                {'name': 'Sun', 'value': 75},
+            ]
+
+            # 3. Flow Data (Mocked from DB for now)
+            flow = [
+                {'name': 'Node A', 'out': 400, 'in': 240},
+                {'name': 'Node B', 'out': 300, 'in': 139},
+                {'name': 'Node C', 'out': 200, 'in': 980},
+                {'name': 'Node D', 'out': 278, 'in': 390},
+            ]
+
+            # 4. Risk Intel
+            risks_records = await conn.fetch("""
+                SELECT p.name, i.quantity_on_hand, i.reorder_point
+                FROM inventory i
+                JOIN products p ON i.product_id = p.id
+                WHERE i.quantity_on_hand <= i.reorder_point
+                LIMIT 2
+            """)
+            
+            risks = []
+            for r in risks_records:
+                risks.append({
+                    "level": "Critical" if r['quantity_on_hand'] == 0 else "Warning",
+                    "text": f"Low stock alert for {r['name']}: Only {r['quantity_on_hand']} left (reorder at {r['reorder_point']}).",
+                })
+            
+            if not risks:
+                risks = [{
+                    "level": "Warning",
+                    "text": "System running normally, but monitoring global events."
+                }]
+
+            return {
+                "shipments": shipments,
+                "performance": performance,
+                "flow": flow,
+                "risks": risks
+            }
+    except Exception as exc:
+        logger.exception("Error fetching dashboard data: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Database connection error: {str(exc)}",
+        )
+
+
 @app.post(
     "/api/workflow",
     response_model=WorkflowResponse,
     status_code=status.HTTP_200_OK,
-    tags=["Workflow Orchestration (Day 2)"],
+    tags=["Workflow Orchestration (Multi Agent Mode)"],
     summary="Execute Multi-Agent LangGraph Workflow",
     description="Exposes the LangGraph Supervisor Orchestrator. Evaluates the user query, routes to appropriate single agents, and returns the unified state.",
 )
@@ -212,7 +285,7 @@ async def execute_workflow(req: WorkflowRequest) -> WorkflowResponse:
     "/api/agent/{agent_name}",
     response_model=WorkflowResponse,
     status_code=status.HTTP_200_OK,
-    tags=["Single Agents (Day 1)"],
+    tags=["Single Agents (Single Agent Mode)"],
     summary="Execute Standalone Single AI Agent",
     description="Invokes a specific single AI agent directly without triggering the LangGraph supervisor.",
 )
@@ -220,7 +293,7 @@ async def execute_single_agent(
     agent_name: str,
     req: SingleAgentRequest,
 ) -> WorkflowResponse:
-    """Execute a single AI agent directly (Day 1 Mode)."""
+    """Execute a single AI agent directly (Single Agent Mode)."""
     t0 = time.perf_counter()
     canonical_key = agent_name.strip().lower()
     agent_fn = get_single_agent_fn(canonical_key)

@@ -1,7 +1,29 @@
-import { useState, useEffect, useRef } from "react";
+import os
+
+content = """import { useState, useEffect, useRef } from "react";
 import { Search, Moon, Sun, ArrowRight, MessageSquare, Send, AlertTriangle, Package, Activity, Cpu, Database, Network, Server, User } from "lucide-react";
-import { runWorkflow, runSingleAgent, fetchDashboardData } from "./api";
+import { runWorkflow, runSingleAgent } from "./api";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, LineChart, Line } from "recharts";
+
+const performanceData = [
+  { name: 'Mon', value: 40 },
+  { name: 'Tue', value: 60 },
+  { name: 'Wed', value: 45 },
+  { name: 'Thu', value: 80 },
+  { name: 'Fri', value: 50 },
+  { name: 'Sat', value: 90 },
+  { name: 'Sun', value: 75 },
+];
+
+const flowData = [
+  { name: 'Node A', out: 400, in: 240 },
+  { name: 'Node B', out: 300, in: 139 },
+  { name: 'Node C', out: 200, in: 980 },
+  { name: 'Node D', out: 278, in: 390 },
+  { name: 'Node E', out: 189, in: 480 },
+  { name: 'Node F', out: 239, in: 380 },
+  { name: 'Node G', out: 349, in: 430 },
+];
 
 const AGENTS = [
   { id: 'inventory', name: 'Inventory Planning', icon: Database, color: 'text-accent-primary' },
@@ -20,14 +42,10 @@ export default function App() {
   const [chatInput, setChatInput] = useState("");
   const [agentState, setAgentState] = useState(null);
   
-  const [orchestratorMode, setOrchestratorMode] = useState("multi");
+  // New States for Single vs Multi Agent Mode
+  const [orchestratorMode, setOrchestratorMode] = useState("multi"); // "multi" or "single"
   const [selectedSingleAgent, setSelectedSingleAgent] = useState("inventory");
   
-  // Dashboard Data State
-  const [dashboardData, setDashboardData] = useState(null);
-  const [isLoadingDashboard, setIsLoadingDashboard] = useState(true);
-  const [isProfileOpen, setIsProfileOpen] = useState(false);
-
   const chatEndRef = useRef(null);
 
   useEffect(() => {
@@ -39,24 +57,6 @@ export default function App() {
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isTyping]);
-
-  useEffect(() => {
-    const loadDashboard = async () => {
-      try {
-        const data = await fetchDashboardData();
-        setDashboardData(data);
-      } catch (err) {
-        console.error("Failed to fetch dashboard data", err);
-      } finally {
-        setIsLoadingDashboard(false);
-      }
-    };
-    loadDashboard();
-    
-    // Refresh every 30 seconds
-    const interval = setInterval(loadDashboard, 30000);
-    return () => clearInterval(interval);
-  }, []);
 
   const handleSend = async (e) => {
     e.preventDefault();
@@ -77,21 +77,13 @@ export default function App() {
       
       setMessages(prev => [...prev, { 
         role: 'bot', 
-        content: (function() {
-  if (response.final_answer && !response.final_answer.startsWith("Standalone Single Agent")) return response.final_answer;
-  if (response.state && response.state[selectedSingleAgent]) {
-     const st = response.state[selectedSingleAgent];
-     if (st._adjustment_plan && st._adjustment_plan.summary) return st._adjustment_plan.summary;
-     if (st.analysis) return st.analysis;
-     if (st.message) return st.message;
-  }
-  return response.final_answer || response.final_response || "Execution completed successfully.";
-})() 
+        content: response.final_response || response.message || "Execution completed successfully." 
       }]);
       
       if (response.state) {
          setAgentState(response.state);
       } else if (response.agent_state) {
+         // Fallback for single agent response structure
          setAgentState(prev => ({
            ...prev,
            [selectedSingleAgent]: response.agent_state
@@ -111,79 +103,75 @@ export default function App() {
     <>
       <header className="mb-16">
         <h1 className="text-4xl font-light tracking-tight mb-2">Live Telemetry</h1>
-        <p className="text-text-secondary">Monitoring global supply chain metrics directly from PostgreSQL.</p>
+        <p className="text-text-secondary">Monitoring global supply chain metrics.</p>
       </header>
 
-      {isLoadingDashboard ? (
-        <div className="text-text-secondary text-sm">Loading real-time data from database...</div>
-      ) : (
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-x-16 gap-y-16">
-          <section className="xl:col-span-2">
-            <div className="flex items-end justify-between mb-4 border-b border-border-panel pb-3">
-              <h2 className="text-sm font-medium tracking-wide text-text-secondary uppercase">Route Tracking (Load over time)</h2>
-              <span className="text-xs font-mono text-text-secondary text-accent-primary">ACTIVE</span>
-            </div>
-            <div className="h-[400px] w-full flex flex-col items-center justify-center bg-border-panel/10 p-4 rounded-xl border border-border-panel">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={dashboardData?.flow || []} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="colorOut" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="var(--color-accent-primary)" stopOpacity={0.3}/>
-                      <stop offset="95%" stopColor="var(--color-accent-primary)" stopOpacity={0}/>
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-panel)" vertical={false} />
-                  <XAxis dataKey="name" stroke="var(--color-text-secondary)" fontSize={12} tickLine={false} axisLine={false} />
-                  <YAxis stroke="var(--color-text-secondary)" fontSize={12} tickLine={false} axisLine={false} />
-                  <Tooltip 
-                    contentStyle={{ backgroundColor: 'var(--color-bg-panel)', borderColor: 'var(--color-border-panel)', color: 'var(--color-text-primary)' }}
-                    itemStyle={{ color: 'var(--color-text-primary)' }}
-                  />
-                  <Area type="monotone" dataKey="out" stroke="var(--color-accent-primary)" fillOpacity={1} fill="url(#colorOut)" />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          </section>
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-x-16 gap-y-16">
+        <section className="xl:col-span-2">
+          <div className="flex items-end justify-between mb-4 border-b border-border-panel pb-3">
+            <h2 className="text-sm font-medium tracking-wide text-text-secondary uppercase">Route Tracking (Load over time)</h2>
+            <span className="text-xs font-mono text-text-secondary text-accent-primary">ACTIVE</span>
+          </div>
+          <div className="h-[400px] w-full flex flex-col items-center justify-center bg-border-panel/10 p-4 rounded-xl border border-border-panel">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={flowData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="colorOut" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="var(--color-accent-primary)" stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor="var(--color-accent-primary)" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-panel)" vertical={false} />
+                <XAxis dataKey="name" stroke="var(--color-text-secondary)" fontSize={12} tickLine={false} axisLine={false} />
+                <YAxis stroke="var(--color-text-secondary)" fontSize={12} tickLine={false} axisLine={false} />
+                <Tooltip 
+                  contentStyle={{ backgroundColor: 'var(--color-bg-panel)', borderColor: 'var(--color-border-panel)', color: 'var(--color-text-primary)' }}
+                  itemStyle={{ color: 'var(--color-text-primary)' }}
+                />
+                <Area type="monotone" dataKey="out" stroke="var(--color-accent-primary)" fillOpacity={1} fill="url(#colorOut)" />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </section>
 
-          <section>
-            <div className="flex items-end justify-between mb-4 border-b border-border-panel pb-3">
-              <h2 className="text-sm font-medium tracking-wide text-text-secondary uppercase">Performance</h2>
-              <span className="text-xs text-text-secondary">Last 7 Days</span>
-            </div>
-            <div className="h-48 w-full bg-border-panel/10 p-4 rounded-xl border border-border-panel">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={dashboardData?.performance || []}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-panel)" vertical={false} />
-                  <XAxis dataKey="name" stroke="var(--color-text-secondary)" fontSize={12} tickLine={false} axisLine={false} />
-                  <Tooltip 
-                    contentStyle={{ backgroundColor: 'var(--color-bg-panel)', borderColor: 'var(--color-border-panel)', color: 'var(--color-text-primary)' }}
-                  />
-                  <Line type="monotone" dataKey="value" stroke="var(--color-accent-success)" strokeWidth={2} dot={{ r: 4, fill: 'var(--color-bg-panel)' }} activeDot={{ r: 6 }} />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </section>
+        <section>
+          <div className="flex items-end justify-between mb-4 border-b border-border-panel pb-3">
+            <h2 className="text-sm font-medium tracking-wide text-text-secondary uppercase">Performance</h2>
+            <span className="text-xs text-text-secondary">Last 7 Days</span>
+          </div>
+          <div className="h-48 w-full bg-border-panel/10 p-4 rounded-xl border border-border-panel">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={performanceData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-panel)" vertical={false} />
+                <XAxis dataKey="name" stroke="var(--color-text-secondary)" fontSize={12} tickLine={false} axisLine={false} />
+                <Tooltip 
+                  contentStyle={{ backgroundColor: 'var(--color-bg-panel)', borderColor: 'var(--color-border-panel)', color: 'var(--color-text-primary)' }}
+                />
+                <Line type="monotone" dataKey="value" stroke="var(--color-accent-success)" strokeWidth={2} dot={{ r: 4, fill: 'var(--color-bg-panel)' }} activeDot={{ r: 6 }} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </section>
 
-          <section>
-            <div className="flex items-end justify-between mb-4 border-b border-border-panel pb-3">
-              <h2 className="text-sm font-medium tracking-wide text-text-secondary uppercase">Flow Analysis</h2>
-              <button className="text-xs text-text-primary hover:underline uppercase tracking-wider font-medium">Interact</button>
-            </div>
-            <div className="h-48 w-full bg-border-panel/10 p-4 rounded-xl border border-border-panel">
-               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={dashboardData?.flow || []}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-panel)" vertical={false} />
-                  <XAxis dataKey="name" stroke="var(--color-text-secondary)" fontSize={12} tickLine={false} axisLine={false} />
-                  <Tooltip 
-                    contentStyle={{ backgroundColor: 'var(--color-bg-panel)', borderColor: 'var(--color-border-panel)' }}
-                  />
-                  <Line type="monotone" dataKey="in" stroke="var(--color-accent-warning)" strokeWidth={2} dot={false} />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </section>
-        </div>
-      )}
+        <section>
+          <div className="flex items-end justify-between mb-4 border-b border-border-panel pb-3">
+            <h2 className="text-sm font-medium tracking-wide text-text-secondary uppercase">Flow Analysis</h2>
+            <button className="text-xs text-text-primary hover:underline uppercase tracking-wider font-medium">Interact</button>
+          </div>
+          <div className="h-48 w-full bg-border-panel/10 p-4 rounded-xl border border-border-panel">
+             <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={flowData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-panel)" vertical={false} />
+                <XAxis dataKey="name" stroke="var(--color-text-secondary)" fontSize={12} tickLine={false} axisLine={false} />
+                <Tooltip 
+                  contentStyle={{ backgroundColor: 'var(--color-bg-panel)', borderColor: 'var(--color-border-panel)' }}
+                />
+                <Line type="monotone" dataKey="in" stroke="var(--color-accent-warning)" strokeWidth={2} dot={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </section>
+      </div>
     </>
   );
 
@@ -191,11 +179,7 @@ export default function App() {
     <>
       <header className="mb-16">
         <h1 className="text-4xl font-light tracking-tight mb-2">Active Shipments</h1>
-        <p className="text-text-secondary">
-          {isLoadingDashboard 
-            ? 'Loading active shipments...' 
-            : `Tracking ${dashboardData?.shipments?.length || 0} ongoing freight movements.`}
-        </p>
+        <p className="text-text-secondary">Tracking {agentState?.shipments ? agentState.shipments.length : "1,284"} ongoing freight movements.</p>
       </header>
 
       <div className="w-full">
@@ -206,23 +190,20 @@ export default function App() {
           <div className="text-right">Status</div>
         </div>
         <div className="space-y-2">
-          {dashboardData?.shipments?.map((shipment, idx) => (
-            <div key={idx} className="grid grid-cols-5 items-center border-b border-border-panel/50 pb-4 pt-2 text-sm">
+          {[1, 2, 3, 4, 5].map((item) => (
+            <div key={item} className="grid grid-cols-5 items-center border-b border-border-panel/50 pb-4 pt-2 text-sm">
               <div className="col-span-2 flex items-center gap-3">
                 <Package size={16} className="text-text-secondary" />
-                <span className="font-mono">{shipment.tracking_number}</span>
+                <span className="font-mono">SHP-293{item}4X</span>
               </div>
-              <div className="text-text-secondary">{shipment.origin || 'Warehouse A'}</div>
-              <div className="text-text-secondary">{shipment.destination || 'N/A'}</div>
+              <div className="text-text-secondary">Shanghai, CN</div>
+              <div className="text-text-secondary">Rotterdam, NL</div>
               <div className="text-right flex items-center justify-end gap-2 text-accent-primary">
                 <Activity size={14} />
-                <span className="capitalize">{shipment.status.replace('_', ' ')}</span>
+                <span>In Transit</span>
               </div>
             </div>
           ))}
-          {!isLoadingDashboard && (!dashboardData?.shipments || dashboardData.shipments.length === 0) && (
-             <div className="text-sm text-text-secondary py-4">No active shipments found in the database.</div>
-          )}
         </div>
       </div>
     </>
@@ -232,26 +213,21 @@ export default function App() {
     <>
       <header className="mb-16">
         <h1 className="text-4xl font-light tracking-tight mb-2">Risk Intel</h1>
-        <p className="text-text-secondary">Automated vulnerability and disruption tracking from database.</p>
+        <p className="text-text-secondary">Automated vulnerability and disruption tracking.</p>
       </header>
 
       <div className="space-y-6">
-        {isLoadingDashboard ? (
-          <div className="text-text-secondary text-sm">Analyzing supply chain risks...</div>
-        ) : dashboardData?.risks?.map((risk, i) => (
-          <div key={i} className={`p-6 border flex items-start gap-4 rounded-xl ${
-            risk.level === 'Critical' ? 'border-accent-critical/20 bg-accent-critical/10' : 'border-accent-warning/20 bg-accent-warning/10'
-          }`}>
-            <AlertTriangle size={20} className={risk.level === 'Critical' ? 'text-accent-critical' : 'text-accent-warning'} />
+        {[
+          { level: 'Critical', text: 'Port Congestion at Long Beach expected to delay 4 inbound vessels by 72h.', icon: AlertTriangle, color: 'text-accent-critical', bg: 'bg-accent-critical/10', border: 'border-accent-critical/20' },
+          { level: 'Warning', text: 'Typhoon approaching South China Sea, potential rerouting for 12 shipments.', icon: AlertTriangle, color: 'text-accent-warning', bg: 'bg-accent-warning/10', border: 'border-accent-warning/20' }
+        ].map((risk, i) => (
+          <div key={i} className={`p-6 border ${risk.border} ${risk.bg} flex items-start gap-4 rounded-xl`}>
+            <risk.icon size={20} className={risk.color} />
             <div>
-              <h3 className={`text-sm font-medium uppercase tracking-wider mb-2 ${
-                risk.level === 'Critical' ? 'text-accent-critical' : 'text-accent-warning'
-              }`}>{risk.level}</h3>
+              <h3 className={`text-sm font-medium uppercase tracking-wider mb-2 ${risk.color}`}>{risk.level}</h3>
               <p className="text-sm font-light leading-relaxed">{risk.text}</p>
               <div className="mt-4 flex gap-4">
-                <button className={`text-xs uppercase tracking-widest font-medium hover:opacity-70 transition-opacity ${
-                  risk.level === 'Critical' ? 'text-accent-critical' : 'text-accent-warning'
-                }`}>Mitigate</button>
+                <button className={`text-xs uppercase tracking-widest font-medium ${risk.color} hover:opacity-70 transition-opacity`}>Mitigate</button>
                 <button className="text-xs uppercase tracking-widest font-medium text-text-secondary hover:text-text-primary transition-colors">Details</button>
               </div>
             </div>
@@ -291,8 +267,7 @@ export default function App() {
                 <pre className="text-xs font-mono text-text-secondary">
                   {agentState && agentState[agent.id] 
                     ? JSON.stringify(agentState[agent.id], null, 2) 
-                    : `// No state available for ${agent.id}
-// Run a workflow via Gemini to populate.`}
+                    : `// No state available for ${agent.id}\n// Run a workflow via Gemini to populate.`}
                 </pre>
               </div>
             </div>
@@ -303,13 +278,13 @@ export default function App() {
   };
 
   return (
-    <div className="h-screen w-full flex flex-col lg:flex-row bg-bg-base text-text-primary font-sans font-light overflow-hidden">
+    <div className="h-screen w-full flex bg-bg-base text-text-primary font-sans font-light overflow-hidden">
       
       {/* LEFT COLUMN: MAIN STAGE */}
       <div className="flex-1 flex flex-col min-w-0 border-r border-border-panel">
         
         {/* Strictly Aligned Header */}
-        <header className="h-20 px-6 lg:px-16 flex items-center justify-between shrink-0 border-b border-border-panel">
+        <header className="h-20 px-16 flex items-center justify-between shrink-0 border-b border-border-panel">
           <div className="flex items-center gap-16">
             <div className="flex items-center gap-4 cursor-pointer group">
               <div className="w-5 h-5 bg-text-primary flex items-center justify-center group-hover:bg-accent-primary transition-colors rounded-sm">
@@ -318,7 +293,7 @@ export default function App() {
               <span className="font-medium tracking-tight text-lg">Orchestrator</span>
             </div>
             
-            <nav className="flex overflow-x-auto gap-6 lg:gap-10 text-sm hide-scrollbar">
+            <nav className="hidden md:flex gap-10 text-sm">
               {['Dashboard', 'Shipments', 'Risks', 'Agents'].map((tab) => (
                 <div key={tab} onClick={() => setActiveTab(tab)} className="relative cursor-pointer group h-20 flex items-center">
                   <span className={`transition-colors ${activeTab === tab ? 'text-text-primary font-medium' : 'text-text-secondary group-hover:text-text-primary'}`}>
@@ -333,36 +308,22 @@ export default function App() {
           </div>
           
           <div className="flex items-center gap-8 text-text-secondary">
-
+            <div className="hidden sm:flex items-center gap-3 cursor-pointer hover:text-text-primary transition-colors">
+              <Search size={16} />
+              <span className="text-sm">Search</span>
+              <span className="text-xs font-mono opacity-50">⌘K</span>
+            </div>
             <button onClick={() => setIsDark(!isDark)} className="hover:text-text-primary transition-colors cursor-pointer">
               {isDark ? <Sun size={16} /> : <Moon size={16} />}
             </button>
-            <div className="relative ml-2">
-              <div 
-                onClick={() => setIsProfileOpen(!isProfileOpen)}
-                className="w-8 h-8 bg-border-panel flex items-center justify-center cursor-pointer hover:opacity-80 transition-opacity rounded-full overflow-hidden"
-              >
-                <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix&backgroundColor=transparent" alt="User" className="w-full h-full opacity-80" />
-              </div>
-              
-              {isProfileOpen && (
-                <div className="absolute right-0 mt-3 w-48 bg-bg-panel border border-border-panel rounded-xl shadow-2xl py-2 z-50">
-                  <div className="px-4 py-2 border-b border-border-panel mb-1">
-                    <p className="text-sm font-medium">Logistics Admin</p>
-                    <p className="text-xs text-text-secondary truncate">admin@orchestrator.local</p>
-                  </div>
-                  <button onClick={() => { alert('Profile Settings feature coming soon!'); setIsProfileOpen(false); }} className="w-full text-left px-4 py-2 text-sm hover:bg-border-panel/30 transition-colors">Profile Settings</button>
-                  <button onClick={() => { alert('API Keys feature coming soon!'); setIsProfileOpen(false); }} className="w-full text-left px-4 py-2 text-sm hover:bg-border-panel/30 transition-colors">API Keys</button>
-                  <div className="border-t border-border-panel my-1"></div>
-                  <button onClick={() => { alert('User authentication not yet implemented.'); setIsProfileOpen(false); }} className="w-full text-left px-4 py-2 text-sm text-accent-critical hover:bg-accent-critical/10 transition-colors">Log Out</button>
-                </div>
-              )}
+            <div className="w-8 h-8 bg-border-panel flex items-center justify-center cursor-pointer hover:opacity-80 transition-opacity ml-2 rounded-full overflow-hidden">
+              <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix&backgroundColor=transparent" alt="User" className="w-full h-full opacity-80" />
             </div>
           </div>
         </header>
 
         {/* Content Area - Exact padding match with header */}
-        <main className="flex-1 overflow-y-auto px-6 lg:px-16 py-8 lg:py-12">
+        <main className="flex-1 overflow-y-auto px-16 py-12">
           {activeTab === "Dashboard" && renderDashboard()}
           {activeTab === "Shipments" && renderShipments()}
           {activeTab === "Risks" && renderRisks()}
@@ -371,7 +332,7 @@ export default function App() {
       </div>
 
       {/* RIGHT COLUMN: Gemini - Fixed width, strictly aligned padding */}
-      <aside className="w-full lg:w-[420px] h-[50vh] lg:h-full flex flex-col shrink-0 bg-bg-base border-t lg:border-t-0 lg:border-l border-border-panel shadow-2xl z-10">
+      <aside className="w-[420px] flex flex-col shrink-0 bg-bg-base border-l border-border-panel shadow-2xl z-10">
         
         <div className="h-20 px-10 flex items-center justify-between shrink-0 border-b border-border-panel">
           <span className="text-sm font-medium tracking-tight">Gemini</span>
@@ -476,3 +437,7 @@ export default function App() {
     </div>
   );
 }
+"""
+with open(r'f:\agentverse\Supply-Chain-Orchestrator\ui\src\App.jsx', 'w', encoding='utf-8') as f:
+    f.write(content)
+print('Updated App.jsx successfully.')

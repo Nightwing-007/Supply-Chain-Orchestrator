@@ -1,4 +1,6 @@
-import { useState, useEffect, useRef } from "react";
+import os
+
+content = """import { useState, useEffect, useRef } from "react";
 import { Search, Moon, Sun, ArrowRight, MessageSquare, Send, AlertTriangle, Package, Activity, Cpu, Database, Network, Server, User } from "lucide-react";
 import { runWorkflow, runSingleAgent, fetchDashboardData } from "./api";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, LineChart, Line } from "recharts";
@@ -26,7 +28,6 @@ export default function App() {
   // Dashboard Data State
   const [dashboardData, setDashboardData] = useState(null);
   const [isLoadingDashboard, setIsLoadingDashboard] = useState(true);
-  const [isProfileOpen, setIsProfileOpen] = useState(false);
 
   const chatEndRef = useRef(null);
 
@@ -77,16 +78,7 @@ export default function App() {
       
       setMessages(prev => [...prev, { 
         role: 'bot', 
-        content: (function() {
-  if (response.final_answer && !response.final_answer.startsWith("Standalone Single Agent")) return response.final_answer;
-  if (response.state && response.state[selectedSingleAgent]) {
-     const st = response.state[selectedSingleAgent];
-     if (st._adjustment_plan && st._adjustment_plan.summary) return st._adjustment_plan.summary;
-     if (st.analysis) return st.analysis;
-     if (st.message) return st.message;
-  }
-  return response.final_answer || response.final_response || "Execution completed successfully.";
-})() 
+        content: response.final_response || response.message || "Execution completed successfully." 
       }]);
       
       if (response.state) {
@@ -291,8 +283,7 @@ export default function App() {
                 <pre className="text-xs font-mono text-text-secondary">
                   {agentState && agentState[agent.id] 
                     ? JSON.stringify(agentState[agent.id], null, 2) 
-                    : `// No state available for ${agent.id}
-// Run a workflow via Gemini to populate.`}
+                    : `// No state available for ${agent.id}\n// Run a workflow via Gemini to populate.`}
                 </pre>
               </div>
             </div>
@@ -303,13 +294,13 @@ export default function App() {
   };
 
   return (
-    <div className="h-screen w-full flex flex-col lg:flex-row bg-bg-base text-text-primary font-sans font-light overflow-hidden">
+    <div className="h-screen w-full flex bg-bg-base text-text-primary font-sans font-light overflow-hidden">
       
       {/* LEFT COLUMN: MAIN STAGE */}
       <div className="flex-1 flex flex-col min-w-0 border-r border-border-panel">
         
         {/* Strictly Aligned Header */}
-        <header className="h-20 px-6 lg:px-16 flex items-center justify-between shrink-0 border-b border-border-panel">
+        <header className="h-20 px-16 flex items-center justify-between shrink-0 border-b border-border-panel">
           <div className="flex items-center gap-16">
             <div className="flex items-center gap-4 cursor-pointer group">
               <div className="w-5 h-5 bg-text-primary flex items-center justify-center group-hover:bg-accent-primary transition-colors rounded-sm">
@@ -318,7 +309,7 @@ export default function App() {
               <span className="font-medium tracking-tight text-lg">Orchestrator</span>
             </div>
             
-            <nav className="flex overflow-x-auto gap-6 lg:gap-10 text-sm hide-scrollbar">
+            <nav className="hidden md:flex gap-10 text-sm">
               {['Dashboard', 'Shipments', 'Risks', 'Agents'].map((tab) => (
                 <div key={tab} onClick={() => setActiveTab(tab)} className="relative cursor-pointer group h-20 flex items-center">
                   <span className={`transition-colors ${activeTab === tab ? 'text-text-primary font-medium' : 'text-text-secondary group-hover:text-text-primary'}`}>
@@ -333,36 +324,22 @@ export default function App() {
           </div>
           
           <div className="flex items-center gap-8 text-text-secondary">
-
+            <div className="hidden sm:flex items-center gap-3 cursor-pointer hover:text-text-primary transition-colors">
+              <Search size={16} />
+              <span className="text-sm">Search</span>
+              <span className="text-xs font-mono opacity-50">⌘K</span>
+            </div>
             <button onClick={() => setIsDark(!isDark)} className="hover:text-text-primary transition-colors cursor-pointer">
               {isDark ? <Sun size={16} /> : <Moon size={16} />}
             </button>
-            <div className="relative ml-2">
-              <div 
-                onClick={() => setIsProfileOpen(!isProfileOpen)}
-                className="w-8 h-8 bg-border-panel flex items-center justify-center cursor-pointer hover:opacity-80 transition-opacity rounded-full overflow-hidden"
-              >
-                <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix&backgroundColor=transparent" alt="User" className="w-full h-full opacity-80" />
-              </div>
-              
-              {isProfileOpen && (
-                <div className="absolute right-0 mt-3 w-48 bg-bg-panel border border-border-panel rounded-xl shadow-2xl py-2 z-50">
-                  <div className="px-4 py-2 border-b border-border-panel mb-1">
-                    <p className="text-sm font-medium">Logistics Admin</p>
-                    <p className="text-xs text-text-secondary truncate">admin@orchestrator.local</p>
-                  </div>
-                  <button onClick={() => { alert('Profile Settings feature coming soon!'); setIsProfileOpen(false); }} className="w-full text-left px-4 py-2 text-sm hover:bg-border-panel/30 transition-colors">Profile Settings</button>
-                  <button onClick={() => { alert('API Keys feature coming soon!'); setIsProfileOpen(false); }} className="w-full text-left px-4 py-2 text-sm hover:bg-border-panel/30 transition-colors">API Keys</button>
-                  <div className="border-t border-border-panel my-1"></div>
-                  <button onClick={() => { alert('User authentication not yet implemented.'); setIsProfileOpen(false); }} className="w-full text-left px-4 py-2 text-sm text-accent-critical hover:bg-accent-critical/10 transition-colors">Log Out</button>
-                </div>
-              )}
+            <div className="w-8 h-8 bg-border-panel flex items-center justify-center cursor-pointer hover:opacity-80 transition-opacity ml-2 rounded-full overflow-hidden">
+              <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix&backgroundColor=transparent" alt="User" className="w-full h-full opacity-80" />
             </div>
           </div>
         </header>
 
         {/* Content Area - Exact padding match with header */}
-        <main className="flex-1 overflow-y-auto px-6 lg:px-16 py-8 lg:py-12">
+        <main className="flex-1 overflow-y-auto px-16 py-12">
           {activeTab === "Dashboard" && renderDashboard()}
           {activeTab === "Shipments" && renderShipments()}
           {activeTab === "Risks" && renderRisks()}
@@ -371,7 +348,7 @@ export default function App() {
       </div>
 
       {/* RIGHT COLUMN: Gemini - Fixed width, strictly aligned padding */}
-      <aside className="w-full lg:w-[420px] h-[50vh] lg:h-full flex flex-col shrink-0 bg-bg-base border-t lg:border-t-0 lg:border-l border-border-panel shadow-2xl z-10">
+      <aside className="w-[420px] flex flex-col shrink-0 bg-bg-base border-l border-border-panel shadow-2xl z-10">
         
         <div className="h-20 px-10 flex items-center justify-between shrink-0 border-b border-border-panel">
           <span className="text-sm font-medium tracking-tight">Gemini</span>
@@ -476,3 +453,7 @@ export default function App() {
     </div>
   );
 }
+"""
+with open(r'f:\agentverse\Supply-Chain-Orchestrator\ui\src\App.jsx', 'w', encoding='utf-8') as f:
+    f.write(content)
+print('Updated App.jsx successfully.')
