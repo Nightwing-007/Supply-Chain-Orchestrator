@@ -58,21 +58,21 @@ export default function App() {
     return () => clearInterval(interval);
   }, []);
 
-  const handleSend = async (e) => {
-    e.preventDefault();
-    if (!chatInput.trim()) return;
-    
-    const query = chatInput.trim();
-    setMessages(prev => [...prev, { role: 'user', content: query }]);
-    setChatInput('');
+  const submitQuery = async (queryText) => {
+    if (!queryText.trim()) return;
+    setMessages(prev => [...prev, { role: 'user', content: queryText }]);
     setIsTyping(true);
+    // ensure sidebar is visible if on mobile
+    if (window.innerWidth < 1024) {
+      document.querySelector('aside')?.scrollIntoView({ behavior: 'smooth' });
+    }
 
     try {
       let response;
       if (orchestratorMode === "multi") {
-        response = await runWorkflow(query);
+        response = await runWorkflow(queryText);
       } else {
-        response = await runSingleAgent(selectedSingleAgent, query, agentState || {});
+        response = await runSingleAgent(selectedSingleAgent, queryText, agentState || {});
       }
       
       setMessages(prev => [...prev, { 
@@ -84,6 +84,10 @@ export default function App() {
      if (st._adjustment_plan && st._adjustment_plan.summary) return st._adjustment_plan.summary;
      if (st.analysis) return st.analysis;
      if (st.message) return st.message;
+     if (st.summary) return st.summary;
+     if (Object.keys(st).length > 0) {
+       return `Agent executed successfully. Result:\n${JSON.stringify(st, null, 2)}`;
+     }
   }
   return response.final_answer || response.final_response || "Execution completed successfully.";
 })() 
@@ -105,6 +109,13 @@ export default function App() {
     } finally {
       setIsTyping(false);
     }
+  };
+
+  const handleSend = async (e) => {
+    e.preventDefault();
+    const text = chatInput;
+    setChatInput('');
+    await submitQuery(text);
   };
 
   const renderDashboard = () => (
@@ -249,10 +260,10 @@ export default function App() {
               }`}>{risk.level}</h3>
               <p className="text-sm font-light leading-relaxed">{risk.text}</p>
               <div className="mt-4 flex gap-4">
-                <button className={`text-xs uppercase tracking-widest font-medium hover:opacity-70 transition-opacity ${
+                <button onClick={() => submitQuery(`Create a mitigation plan for the following risk: ${risk.text}`)} className={`text-xs uppercase tracking-widest font-medium hover:opacity-70 transition-opacity ${
                   risk.level === 'Critical' ? 'text-accent-critical' : 'text-accent-warning'
                 }`}>Mitigate</button>
-                <button className="text-xs uppercase tracking-widest font-medium text-text-secondary hover:text-text-primary transition-colors">Details</button>
+                <button onClick={() => submitQuery(`Provide more details and analysis for the following risk: ${risk.text}`)} className="text-xs uppercase tracking-widest font-medium text-text-secondary hover:text-text-primary transition-colors">Details</button>
               </div>
             </div>
           </div>
@@ -374,7 +385,7 @@ export default function App() {
       <aside className="w-full lg:w-[420px] h-[50vh] lg:h-full flex flex-col shrink-0 bg-bg-base border-t lg:border-t-0 lg:border-l border-border-panel shadow-2xl z-10">
         
         <div className="h-20 px-10 flex items-center justify-between shrink-0 border-b border-border-panel">
-          <span className="text-sm font-medium tracking-tight">Gemini</span>
+          <span className="text-sm font-medium tracking-tight">CHAT</span>
           <div className="flex items-center gap-2 bg-border-panel/30 p-1 rounded-md">
             <button 
               onClick={() => setOrchestratorMode('single')}
@@ -425,9 +436,9 @@ export default function App() {
                 {messages.map((msg, i) => (
                   <div key={i} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'} gap-2`}>
                     <div className="text-[10px] font-medium uppercase tracking-widest text-text-secondary">
-                      {msg.role === 'user' ? 'You' : 'Gemini'}
+                      {msg.role === 'user' ? 'You' : 'CHAT'}
                     </div>
-                    <div className={`p-4 max-w-[90%] font-light leading-relaxed border rounded-2xl ${
+                    <div className={`p-4 max-w-[90%] font-light leading-relaxed border rounded-2xl whitespace-pre-wrap break-words ${
                       msg.role === 'user' 
                         ? 'border-text-primary bg-text-primary text-bg-base rounded-tr-sm' 
                         : 'border-border-panel bg-border-panel/30 text-text-primary rounded-tl-sm shadow-sm'
@@ -438,7 +449,7 @@ export default function App() {
                 ))}
                 {isTyping && (
                   <div className="flex flex-col items-start gap-2">
-                    <div className="text-[10px] font-medium uppercase tracking-widest text-text-secondary">Gemini</div>
+                    <div className="text-[10px] font-medium uppercase tracking-widest text-text-secondary">CHAT</div>
                     <div className="px-5 py-4 border border-border-panel bg-border-panel/30 rounded-2xl rounded-tl-sm flex items-center gap-2 shadow-sm">
                       <div className="w-1.5 h-1.5 bg-text-secondary rounded-full animate-pulse" style={{ animationDelay: '0ms' }}></div>
                       <div className="w-1.5 h-1.5 bg-text-secondary rounded-full animate-pulse" style={{ animationDelay: '150ms' }}></div>
@@ -457,7 +468,7 @@ export default function App() {
                 type="text"
                 value={chatInput}
                 onChange={(e) => setChatInput(e.target.value)}
-                placeholder={orchestratorMode === 'multi' ? "Ask Gemini to run a workflow..." : `Talk to ${AGENTS.find(a => a.id === selectedSingleAgent)?.name}...`}
+                placeholder={orchestratorMode === 'multi' ? "Ask CHAT to run a workflow..." : `Talk to ${AGENTS.find(a => a.id === selectedSingleAgent)?.name}...`}
                 className="w-full bg-transparent text-sm focus:outline-none placeholder:text-text-placeholder pr-8 border-b border-border-panel focus:border-text-primary transition-colors py-3"
               />
               <button
