@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { Search, Moon, Sun, ArrowRight, MessageSquare, Send, AlertTriangle, Package, Activity, Cpu, Database, Network, Server, User } from "lucide-react";
 import { runWorkflow, runSingleAgent, fetchDashboardData } from "./api";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, LineChart, Line } from "recharts";
+import ReactMarkdown from "react-markdown";
 
 const AGENTS = [
   { id: 'inventory', name: 'Inventory Planning', icon: Database, color: 'text-accent-primary' },
@@ -440,12 +441,30 @@ export default function App() {
                     <div className="text-[10px] font-medium uppercase tracking-widest text-text-secondary">
                       {msg.role === 'user' ? 'You' : 'CHAT'}
                     </div>
-                    <div className={`p-4 max-w-[90%] font-light leading-relaxed border rounded-2xl whitespace-pre-wrap break-words ${
+                    <div className={`p-4 max-w-[90%] font-light leading-relaxed border rounded-2xl break-words ${
                       msg.role === 'user' 
-                        ? 'border-text-primary bg-text-primary text-bg-base rounded-tr-sm' 
+                        ? 'border-text-primary bg-text-primary text-bg-base rounded-tr-sm whitespace-pre-wrap' 
                         : (msg.isError ? 'border-accent-critical bg-accent-critical/10 text-accent-critical rounded-tl-sm shadow-sm' : 'border-border-panel bg-border-panel/30 text-text-primary rounded-tl-sm shadow-sm')
                     }`}>
-                      {msg.content}
+                      {msg.role === 'user' ? (
+                        msg.content
+                      ) : (
+                        <ReactMarkdown 
+                          components={{
+                            p: ({node, ...props}) => <p className="mb-2 last:mb-0" {...props} />,
+                            ul: ({node, ...props}) => <ul className="list-disc list-inside my-2 space-y-1.5 pl-1" {...props} />,
+                            ol: ({node, ...props}) => <ol className="list-decimal list-inside my-2 space-y-1.5 pl-1" {...props} />,
+                            li: ({node, ...props}) => <li className="ml-1 leading-snug" {...props} />,
+                            strong: ({node, ...props}) => <strong className="font-semibold text-text-primary" {...props} />,
+                            h1: ({node, ...props}) => <h1 className="text-base font-semibold mb-2 mt-3" {...props} />,
+                            h2: ({node, ...props}) => <h2 className="text-sm font-semibold mb-2 mt-3" {...props} />,
+                            h3: ({node, ...props}) => <h3 className="text-xs font-semibold mb-1 mt-2" {...props} />,
+                            code: ({node, ...props}) => <code className="bg-border-panel/50 px-1.5 py-0.5 rounded text-xs font-mono text-accent-primary" {...props} />,
+                          }}
+                        >
+                          {msg.content}
+                        </ReactMarkdown>
+                      )}
                     </div>
                   </div>
                 ))}

@@ -287,6 +287,9 @@ Analyse warehouse data and provide actionable optimisation recommendations.
 DOMAIN GUARDRAILS:
 Evaluate the user's query. If the query is completely unrelated to your specific domain (Warehouse Operations, capacity utilization, bin layout, pick lists, warehouse space), you MUST NOT process the state data or generate your standard report. Instead, return a polite message stating that this task is outside your scope as the Warehouse Ops Agent in the "summary" field, leave "space_reallocation", "bottleneck_warnings", and "bin_layout_suggestions" empty [], and explicitly suggest which of the other specific agents (Inventory Planning, Demand Forecasting, Route Optimization, Fleet Management, Customer Notification) they should select from the dropdown, or suggest switching to the Multi-Agent Supervisor.
 
+CONVERSATIONAL OUTPUT FORMATTING:
+When responding to a valid user query, your conversational message in the "summary" field (intended for the chat UI) MUST explicitly list the specific details found in the data. Do not use vague references like 'the items listed above' or 'see the data'. You must write out the actual warehouse names/codes, capacity metrics, utilization percentages, specific bin allocations, and reallocation actions in plain, human-readable text (e.g., using bullet points) directly inside your conversational summary string.
+
 Always respond with valid JSON matching the schema provided."""
 
 OPTIMIZATION_PROMPT_TEMPLATE = """Analyse the following user request and warehouse data to generate an Optimization Plan or evaluate domain relevance.
@@ -330,7 +333,7 @@ Return a JSON object with this exact structure:
       "<string: one-sentence suggestion>"
     ]
   }},
-  "summary": "<executive summary of warehouse plan if in-domain, OR a polite out-of-scope redirection message if the user query is completely unrelated to Warehouse Operations>"
+  "summary": "<detailed executive summary answering the User Request / Query. MUST explicitly list warehouse codes, capacity utilization %, bottleneck details, and specific bin layout / reallocation actions using bullet points. Do NOT use vague phrases like 'the warehouses listed above'. If out-of-scope, provide a polite redirection message.>"
 }}
 """
 

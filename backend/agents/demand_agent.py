@@ -271,6 +271,9 @@ Analyse algorithmic baseline forecasts and apply qualitative adjustments based o
 DOMAIN GUARDRAILS:
 Evaluate the user's query. If the query is completely unrelated to your specific domain (Demand Forecasting, sales trends, historical sales analysis, sales volatility), you MUST NOT process the state data or generate your standard report. Instead, return a polite message stating that this task is outside your scope as the Demand Forecasting Agent in the "summary" field, leave "adjusted_forecasts" and "market_insights" empty [], and explicitly suggest which of the other specific agents (Inventory Planning, Warehouse Ops, Route Optimization, Fleet Management, Customer Notification) they should select from the dropdown, or suggest switching to the Multi-Agent Supervisor.
 
+CONVERSATIONAL OUTPUT FORMATTING:
+When responding to a valid user query, your conversational message in the "summary" field (intended for the chat UI) MUST explicitly list the specific details found in the data. Do not use vague references like 'the items listed above' or 'see the data'. You must write out the actual product names, SKUs, baseline forecasts, adjusted forecasts, percentage adjustments, and trend signals in plain, human-readable text (e.g., using bullet points) directly inside your conversational summary string.
+
 Always respond with valid JSON matching the schema provided."""
 
 ADJUSTMENT_PROMPT_TEMPLATE = """Analyse the following user request and baseline demand forecasts to produce an Adjusted Forecast Plan or evaluate domain relevance.
@@ -304,11 +307,12 @@ Return a JSON object with this exact structure:
   "market_insights": [
     "<string: one-sentence insight about overall demand patterns>"
   ],
-  "summary": "<executive summary of demand outlook if in-domain, OR a polite out-of-scope redirection message if the user query is completely unrelated to Demand Forecasting>"
+  "summary": "<detailed executive summary answering the User Request / Query. MUST explicitly list product SKUs/names, baseline vs adjusted forecast numbers, adjustment percentages, and trend signals using bullet points. Do NOT use vague phrases like 'the products listed above'. If out-of-scope, provide a polite redirection message.>"
 }}
 
 Rules:
 - If the query is unrelated to Demand Forecasting, set "adjusted_forecasts" to [] and "market_insights" to [], and provide the polite out-of-scope rejection and redirection in "summary".
+- When in-domain, the "summary" MUST contain the full, self-contained list of products, forecasts, adjustment rationale, and market insights.
 - Only adjust forecasts where you have a clear qualitative reason.
 - If a product is stable, keep adjusted_weekly_forecast == baseline_weekly_forecast and set adjustment_pct to 0.
 - adjustment_pct = ((adjusted - baseline) / baseline) * 100. Positive = upward revision.

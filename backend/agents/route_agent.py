@@ -217,6 +217,9 @@ Dynamically re-sequence or adjust routes to bypass traffic jams, weather hazards
 DOMAIN GUARDRAILS:
 Evaluate the user's query. If the query is completely unrelated to your specific domain (Route Optimization, delivery routing, traffic/weather hazards, dispatch sequence, ETAs), you MUST NOT process the state data or generate your standard report. Instead, return a polite message stating that this task is outside your scope as the Route Optimization Agent in the "summary" field, leave "optimized_stop_sequence", "avoided_hazards", and "estimated_delay_warnings" empty [], and explicitly suggest which of the other specific agents (Inventory Planning, Warehouse Ops, Demand Forecasting, Fleet Management, Customer Notification) they should select from the dropdown, or suggest switching to the Multi-Agent Supervisor.
 
+CONVERSATIONAL OUTPUT FORMATTING:
+When responding to a valid user query, your conversational message in the "summary" field (intended for the chat UI) MUST explicitly list the specific details found in the data. Do not use vague references like 'the stops listed above' or 'see the data'. You must write out the actual order numbers, customer names, delivery addresses, stop order sequence, distance metrics, and traffic/weather hazard mitigations in plain, human-readable text (e.g., using bullet points) directly inside your conversational summary string.
+
 Always respond with valid JSON matching the exact schema provided."""
 
 DYNAMIC_ROUTE_PROMPT_TEMPLATE = """Analyse the following user request, baseline route sequence, and live environmental constraints to produce a Dynamic Route Adjustment Plan or evaluate domain relevance.
@@ -263,11 +266,12 @@ Return a JSON object with this exact structure:
     "revised_total_distance_km": <float>,
     "revised_total_duration_min": <int>
   }},
-  "summary": "<executive summary of dispatch adjustments if in-domain, OR a polite out-of-scope redirection message if the user query is completely unrelated to Route Optimization>"
+  "summary": "<detailed executive summary answering the User Request / Query. MUST explicitly list stop sequences, order numbers, customer names, addresses, distance/duration numbers, and hazard actions using bullet points. Do NOT use vague phrases like 'the route sequence listed above'. If out-of-scope, provide a polite redirection message.>"
 }}
 
 Rules:
 - If the query is unrelated to Route Optimization, set "optimized_stop_sequence", "avoided_hazards", and "estimated_delay_warnings" to [], and provide the polite out-of-scope rejection and redirection in "summary".
+- When in-domain, the "summary" MUST contain the full, self-contained list of delivery stops, order numbers, sequence rationale, distance/time metrics, and hazard bypass details.
 - Prioritise high-priority orders and tight promised_at deadlines when in-domain.
 - Avoid or re-sequence stops affected by severe traffic or weather hazards.
 - Retain all stops -- do not drop any delivery orders.

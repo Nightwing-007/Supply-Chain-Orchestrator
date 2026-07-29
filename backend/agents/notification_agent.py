@@ -152,6 +152,9 @@ Draft tailored, professional Email and SMS messages for logistics customer notif
 DOMAIN GUARDRAILS:
 Evaluate the user's query. If the query is completely unrelated to your specific domain (Customer Notification, customer communications, email/SMS drafting, order status updates), you MUST NOT process the state data or generate a standard customer notification draft. Instead, return a polite message stating that this task is outside your scope as the Customer Notification Agent in the "summary" field and in the email "body", and explicitly suggest which of the other specific agents (Inventory Planning, Warehouse Ops, Demand Forecasting, Route Optimization, Fleet Management) they should select from the dropdown, or suggest switching to the Multi-Agent Supervisor.
 
+CONVERSATIONAL OUTPUT FORMATTING:
+When responding to a valid user query, your conversational message in the email "body" and "summary" fields (intended for the chat UI) MUST explicitly list the specific details found in the data. Do not use vague references like 'the order listed above' or 'see the data'. You must write out the actual customer name, order number, order status, delivery SLA, event/reason details, email subject/body preview, and SMS draft in plain, human-readable text directly inside your conversational response strings.
+
 Always respond with valid JSON matching the exact schema provided."""
 
 NOTIFICATION_PROMPT_TEMPLATE = """Draft a Communication Draft Plan for the following user request and order notification context, or evaluate domain relevance.
@@ -180,19 +183,20 @@ Return a JSON object with this exact structure:
   "communication_plan": {{
     "email": {{
       "subject": "<compelling, context-appropriate subject line>",
-      "body": "<professional email body OR polite out-of-scope redirection message if user query is unrelated to Customer Notification>"
+      "body": "<professional, detailed email body explicitly containing customer name, order number, status, and resolution details>"
     }},
     "sms": {{
-      "body": "<concise SMS message under 160 characters>"
+      "body": "<concise SMS message under 160 characters containing order number and status>"
     }},
     "tone": "<apologetic|enthusiastic|informative|reassuring>",
     "action_taken": "<description of dispatch communication strategy>"
   }},
-  "summary": "<one-sentence summary of the customer notification draft if in-domain, OR a polite out-of-scope redirection message if the user query is completely unrelated to Customer Notification>"
+  "summary": "<detailed executive summary answering the User Request / Query. MUST explicitly state the customer name, order number, communication channel, subject line, and draft message summary. Do NOT use vague phrases like 'the notification above'. If out-of-scope, provide a polite redirection message.>"
 }}
 
 Rules:
 - If the query is unrelated to Customer Notification, place the polite out-of-scope rejection and redirection in "summary" and email "body".
+- When in-domain, both the email "body" and "summary" MUST contain self-contained, detailed information including customer name, order number, and specific event details.
 - Keep the SMS body strictly under 160 characters when in-domain.
 - Ensure the customer's name and order number are included in both Email and SMS when in-domain.
 """
