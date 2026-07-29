@@ -20,7 +20,7 @@ export default function App() {
   const [chatInput, setChatInput] = useState("");
   const [agentState, setAgentState] = useState(null);
   
-  const [orchestratorMode, setOrchestratorMode] = useState("multi");
+  const [orchestratorMode, setOrchestratorMode] = useState("single");
   const [selectedSingleAgent, setSelectedSingleAgent] = useState("inventory");
   
   // Dashboard Data State
@@ -382,12 +382,12 @@ export default function App() {
             >
               Single Agent
             </button>
-            <button 
+            {/* <button 
               onClick={() => setOrchestratorMode('multi')}
               className={`text-xs px-2 py-1 rounded transition-colors ${orchestratorMode === 'multi' ? 'bg-bg-panel shadow-sm text-text-primary font-medium' : 'text-text-secondary hover:text-text-primary'}`}
             >
               Multi Agent
-            </button>
+            </button> */}
           </div>
         </div>
 
