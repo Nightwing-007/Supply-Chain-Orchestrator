@@ -9,7 +9,7 @@ Welcome to your personal architectural masterclass for the **Supply Chain Orches
 ```
 1. THE BIG PICTURE & SYSTEM PARADIGMS
    1.1 System Identity: What is Supply Chain Orchestrator?
-   1.2 Day 1 Mode vs Day 2 Mode: Single-Agent vs Multi-Agent Orchestration
+   1.2 Single Agent Mode vs Multi Agent Mode: Single-Agent vs Multi-Agent Orchestration
    1.3 Real-World Impact: Solving Siloed Supply Chain Fragmentations
 
 2. PROJECT STRUCTURE & CODEBASE MAP
@@ -52,18 +52,18 @@ Welcome to your personal architectural masterclass for the **Supply Chain Orches
 ### 1.1 System Identity: What is Supply Chain Orchestrator?
 **Supply Chain Orchestrator** is an enterprise-grade multi-agent intelligence platform designed to automate complex supply chain logistics. In traditional enterprises, inventory management, warehouse picking, demand forecasting, route planning, fleet maintenance, and customer communication operate in isolated silos. This project unites those six domains under a single self-correcting AI ecosystem.
 
-### 1.2 Day 1 Mode vs Day 2 Mode
+### 1.2 Single Agent Mode vs Multi Agent Mode
 
-Understanding the distinction between Day 1 and Day 2 modes is crucial for demonstrating the system:
+Understanding the distinction between Single Agent Mode and Multi Agent Modes is crucial for demonstrating the system:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                        DAY 1 MODE: SINGLE AGENT                         │
+│                        Single Agent Mode: SINGLE AGENT                         │
 │ User Request ──► Direct REST API ──► Target Agent Function ──► Result   │
 └─────────────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                    DAY 2 MODE: MULTI-AGENT SUPERVISOR                   │
+│                    Multi Agent Mode: MULTI-AGENT SUPERVISOR                   │
 │ User Request ──► LangGraph Supervisor ──► Routing Engine ──► Agent A    │
 │                         ▲                                        │      │
 │                         └─────────── Loop Back ──────────────────┘      │
@@ -72,9 +72,9 @@ Understanding the distinction between Day 1 and Day 2 modes is crucial for demon
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
-- **Day 1: Single Agent Mode (Modular Evaluation):**
+- **Single Agent Mode: Single Agent Mode (Modular Evaluation):**
   The user or client talks directly to one specialized agent (e.g. only the Inventory Agent or only the Route Agent). The request bypasses the supervisor completely, calling `POST /api/agent/{agent_name}`. This proves that each single agent is a standalone, deterministic micro-service.
-- **Day 2: Multi-Agent Supervisor Mode (Systemic Orchestration):**
+- **Multi Agent Mode: Multi-Agent Supervisor Mode (Systemic Orchestration):**
   The user submits a high-level query (e.g. *"Check low stock, inspect warehouse capacity, optimize delivery routes, and notify affected customers"*). The request goes to `POST /api/workflow`. LangGraph's Supervisor node acts as a central **Routing Engine**, invoking agents iteratively in logical order, merging their outputs into a shared state, and concluding when all goals are met.
 
 ---
@@ -104,7 +104,7 @@ AgentVerse/
 │   ├── fleet.py
 │   └── notification.py
 │
-├── agents/                         # The 6 Specialised AI Agents (Day 1 Modules)
+├── agents/                         # The 6 Specialised AI Agents (Single Agent Mode Modules)
 │   ├── inventory_agent.py          # Low-stock detection & reorder planning
 │   ├── warehouse_agent.py          # Capacity & Cycle Sort bin re-indexing
 │   ├── demand_agent.py             # PG window functions & Exponential Smoothing
@@ -112,7 +112,7 @@ AgentVerse/
 │   ├── fleet_agent.py              # Vehicle telemetry thresholding & grounding
 │   └── notification_agent.py       # Natural language Email/SMS drafting
 │
-├── orchestrator/                   # Multi-Agent Coordination Engine (Day 2)
+├── orchestrator/                   # Multi-Agent Coordination Engine (Multi Agent Mode)
 │   ├── state.py                    # GlobalLogisticsState TypedDict Schema
 │   └── supervisor.py               # LangGraph StateGraph Routing & Loop Control
 │
@@ -394,7 +394,7 @@ pytest tests/ -v
 ## 7. Hackathon Demo & Interview Talking Points
 
 ### 7.1 60-Second Elevator Pitch for Judges
-> *"Supply Chain Orchestrator is a smart multi-agent logistics platform built with LangGraph, PostgreSQL, FastAPI, and Google Gemini. Traditional supply chains suffer because inventory, warehouse, fleet, and route planning operate in data silos. We built 6 specialized single AI agents that combine hard mathematical algorithms—like Cycle Sort for minimal-move bin allocations and Haversine Nearest Neighbor TSP for route dispatch—with Gemini 2.5 Flash for qualitative reasoning. On Day 1, each agent works as a standalone micro-service. On Day 2, our LangGraph Supervisor routes complex multi-domain queries iteratively across a shared state graph. Judges can see the live JSON memory update in real-time on our Streamlit dashboard."*
+> *"Supply Chain Orchestrator is a smart multi-agent logistics platform built with LangGraph, PostgreSQL, FastAPI, and Google Gemini. Traditional supply chains suffer because inventory, warehouse, fleet, and route planning operate in data silos. We built 6 specialized single AI agents that combine hard mathematical algorithms—like Cycle Sort for minimal-move bin allocations and Haversine Nearest Neighbor TSP for route dispatch—with Gemini 2.5 Flash for qualitative reasoning. On Single Agent Mode, each agent works as a standalone micro-service. On Multi Agent Mode, our LangGraph Supervisor routes complex multi-domain queries iteratively across a shared state graph. Judges can see the live JSON memory update in real-time on our Streamlit dashboard."*
 
 ---
 

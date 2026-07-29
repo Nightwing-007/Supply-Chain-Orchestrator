@@ -57,10 +57,10 @@ By pairing deterministic domain algorithms (e.g., Cycle Sort, Nearest Neighbor T
                        Google Gemini 2.5 Flash / GitHub Models
 ```
 
-### Phase 1: Modular Single AI Agents (Day 1)
+### Phase 1: Modular Single AI Agents (Single Agent Mode)
 Built **6 independent, stateless async Python agents** with strict JSON input/output contracts. Each agent executes a deterministic algorithmic core (handling heavy math and SQL queries) before invoking Google Gemini 2.5 Flash for qualitative reasoning. Every invocation includes a deterministic fallback mechanism and logs audit metrics to the `agent_task_log` table.
 
-### Phase 2: LangGraph Supervisor Orchestrator & REST API (Day 2)
+### Phase 2: LangGraph Supervisor Orchestrator & REST API (Multi Agent Mode)
 Integrated all 6 agents into a **LangGraph StateGraph shared state network** managed by a central **Supervisor Routing Engine**. The supervisor analyzes the state, past execution history, and user query to dynamically route execution to the appropriate agents, looping iteratively (`Supervisor ──► Agent ──► Supervisor ──► FINISH`) until all tasks are complete. Exposed the orchestrator via a production-ready **FastAPI REST API** (`POST /api/workflow`) with connection pool lifespan hooks and OpenAPI documentation.
 
 ### Phase 3: Streamlit UI & Live State Inspector (Day 3)
