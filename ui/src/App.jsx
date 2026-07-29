@@ -19,18 +19,36 @@ export default function App() {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isTyping]);
 
-  const handleSend = (e) => {
+  const handleSend = async (e) => {
     e.preventDefault();
-    if (!chatInput.trim()) return;
+    const query = chatInput.trim();
+    if (!query) return;
     
-    setMessages(prev => [...prev, { role: 'user', content: chatInput }]);
+    setMessages(prev => [...prev, { role: 'user', content: query }]);
     setChatInput('');
     setIsTyping(true);
 
-    setTimeout(() => {
+    try {
+      const response = await fetch('http://localhost:8000/api/workflow', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: query })
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok && data.final_answer) {
+        setMessages(prev => [...prev, { role: 'bot', content: data.final_answer }]);
+      } else if (response.ok) {
+        setMessages(prev => [...prev, { role: 'bot', content: "Workflow executed successfully, but no final answer was provided." }]);
+      } else {
+        setMessages(prev => [...prev, { role: 'bot', content: `Error: ${data.detail || 'Failed to process request'}` }]);
+      }
+    } catch (error) {
+      setMessages(prev => [...prev, { role: 'bot', content: `Connection error: ${error.message}` }]);
+    } finally {
       setIsTyping(false);
-      setMessages(prev => [...prev, { role: 'bot', content: `Analyzing your request regarding the ${activeTab} view...` }]);
-    }, 1500);
+    }
   };
 
   const renderDashboard = () => (
