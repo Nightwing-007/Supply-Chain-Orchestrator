@@ -160,29 +160,24 @@ def cycle_sort_bins(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
         # Skip duplicates
         while pos < n and items[pos]["pick_count"] == item["pick_count"]:
             pos += 1
-        if pos >= n:
-            pos = cycle_start
-            continue
 
-        # Swap
+        # Put item in its correct position
         if pos != cycle_start:
-            items[cycle_start], items[pos] = items[pos], items[cycle_start]
+            items[pos], item = item, items[pos]
             writes += 1
 
         # Rotate the rest of the cycle
         while pos != cycle_start:
             pos = cycle_start
             for i in range(cycle_start + 1, n):
-                if items[i]["pick_count"] > items[cycle_start]["pick_count"]:
+                if items[i]["pick_count"] > item["pick_count"]:
                     pos += 1
 
-            while pos < n and items[pos]["pick_count"] == items[cycle_start]["pick_count"]:
+            while pos < n and items[pos]["pick_count"] == item["pick_count"]:
                 pos += 1
-            if pos >= n:
-                break
 
-            if items[pos]["pick_count"] != items[cycle_start]["pick_count"]:
-                items[cycle_start], items[pos] = items[pos], items[cycle_start]
+            if item != items[pos]:
+                items[pos], item = item, items[pos]
                 writes += 1
 
     # ── Annotate with new bin indices ────────────────────────

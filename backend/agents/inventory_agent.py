@@ -80,7 +80,10 @@ SYSTEM_INSTRUCTION = """You are an expert supply chain analyst working for a log
 Your job is to analyse inventory data and generate reorder recommendations.
 Always respond with valid JSON matching the schema provided. Be concise but justify each recommendation."""
 
-REORDER_PROMPT_TEMPLATE = """Analyse the following low-stock inventory items and generate a Reorder Plan.
+REORDER_PROMPT_TEMPLATE = """Analyse the following low-stock inventory items and generate a Reorder Plan. If there are no low-stock items, acknowledge that stock is healthy.
+
+## User Request / Query
+{user_query}
 
 ## Low-Stock Items
 {low_stock_json}
@@ -105,7 +108,7 @@ Return a JSON object with this exact structure:
       "justification": "<brief reason>"
     }}
   ],
-  "summary": "<one-paragraph executive summary of the overall inventory health>"
+  "summary": "<one-paragraph executive summary. You MUST directly answer the User Request / Query based on the data provided.>"
 }}
 
 Priority rules:
@@ -195,14 +198,7 @@ async def inventory_planning_agent(
         low_stock_serialisable = _serialise_rows(low_stock_items)
 
         # ── Step 2: Healthy stock — no action needed ─────────
-        if not low_stock_items:
-            result = {
-                "inventory": {
-                    "low_stock_alerts": [],
-                    "reorder_recommendations": [],
-                },
-            }
-            return result
+        # Removed early return so the LLM can answer the user's query even if stock is healthy.
 
         # ── Step 3: Build alerts list ────────────────────────
         alerts = [
@@ -226,8 +222,10 @@ async def inventory_planning_agent(
             llm_service = LLMService()
 
         try:
+            user_query = state.get("query", "Provide a general inventory update.")
             prompt = REORDER_PROMPT_TEMPLATE.format(
-                low_stock_json=json.dumps(low_stock_serialisable, indent=2),
+                user_query=user_query,
+                low_stock_json=json.dumps(low_stock_serialisable, indent=2) if low_stock_serialisable else "[] (Stock is healthy, no items below reorder point)",
                 current_date=datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
             )
             reorder_result = await llm_service.generate(
@@ -241,14 +239,19 @@ async def inventory_planning_agent(
         except Exception as exc:
             logger.error("LLM call failed, using fallback plan: %s", exc)
             reorder_result = _build_fallback_plan(low_stock_serialisable)
+            reorder_result["llm_debug_error"] = str(exc)
 
         # ── Step 5: Assemble state update ────────────────────
         result = {
             "inventory": {
                 "low_stock_alerts": alerts,
                 "reorder_recommendations": reorder_result.get("reorder_plan", []),
+                "summary": reorder_result.get("summary") if reorder_result else "Inventory scan completed.",
             },
         }
+        if reorder_result and "llm_debug_error" in reorder_result:
+            result["inventory"]["llm_debug_error"] = reorder_result["llm_debug_error"]
+            
         return result
 
     except Exception as exc:
@@ -261,6 +264,7 @@ async def inventory_planning_agent(
             "inventory": {
                 "low_stock_alerts": [],
                 "reorder_recommendations": [],
+                "summary": f"Inventory Planning Agent error: {error_msg}",
             },
             "error": f"Inventory Planning Agent error: {error_msg}",
         }

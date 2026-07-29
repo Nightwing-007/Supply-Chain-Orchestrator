@@ -23,7 +23,7 @@ class Settings(BaseSettings):
 
     # ── Google Gemini API ───────────────────────────────────────
     google_api_key: str = ""
-    gemini_model: str = "gemini-2.5-flash"
+    gemini_model: str = "gemini-2.0-flash"
 
     # ── GitHub Models (Azure-compatible) ────────────────────────
     github_token: str = ""

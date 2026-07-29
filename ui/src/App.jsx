@@ -40,38 +40,6 @@ export default function App() {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isTyping]);
 
-<<<<<<< HEAD
-  const handleSend = async (e) => {
-    e.preventDefault();
-    const query = chatInput.trim();
-    if (!query) return;
-    
-    setMessages(prev => [...prev, { role: 'user', content: query }]);
-    setChatInput('');
-    setIsTyping(true);
-
-    try {
-      const response = await fetch('http://localhost:8000/api/workflow', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: query })
-      });
-      
-      const data = await response.json();
-      
-      if (response.ok && data.final_answer) {
-        setMessages(prev => [...prev, { role: 'bot', content: data.final_answer }]);
-      } else if (response.ok) {
-        setMessages(prev => [...prev, { role: 'bot', content: "Workflow executed successfully, but no final answer was provided." }]);
-      } else {
-        setMessages(prev => [...prev, { role: 'bot', content: `Error: ${data.detail || 'Failed to process request'}` }]);
-      }
-    } catch (error) {
-      setMessages(prev => [...prev, { role: 'bot', content: `Connection error: ${error.message}` }]);
-    } finally {
-      setIsTyping(false);
-    }
-=======
   useEffect(() => {
     const loadDashboard = async () => {
       try {
@@ -109,10 +77,12 @@ export default function App() {
       
       setMessages(prev => [...prev, { 
         role: 'bot', 
+        isError: response.state && response.state[selectedSingleAgent]?.llm_debug_error ? true : false,
         content: (function() {
   if (response.final_answer && !response.final_answer.startsWith("Standalone Single Agent")) return response.final_answer;
   if (response.state && response.state[selectedSingleAgent]) {
      const st = response.state[selectedSingleAgent];
+     if (st.llm_debug_error) return `⚠️ LLM ERROR: ${st.llm_debug_error}`;
      if (st._adjustment_plan && st._adjustment_plan.summary) return st._adjustment_plan.summary;
      if (st.analysis) return st.analysis;
      if (st.message) return st.message;
@@ -148,7 +118,6 @@ export default function App() {
     const text = chatInput;
     setChatInput('');
     await submitQuery(text);
->>>>>>> 9d03ee42b17ec70e97430cbd1826045c8a63df01
   };
 
   const renderDashboard = () => (
@@ -474,7 +443,7 @@ export default function App() {
                     <div className={`p-4 max-w-[90%] font-light leading-relaxed border rounded-2xl whitespace-pre-wrap break-words ${
                       msg.role === 'user' 
                         ? 'border-text-primary bg-text-primary text-bg-base rounded-tr-sm' 
-                        : 'border-border-panel bg-border-panel/30 text-text-primary rounded-tl-sm shadow-sm'
+                        : (msg.isError ? 'border-accent-critical bg-accent-critical/10 text-accent-critical rounded-tl-sm shadow-sm' : 'border-border-panel bg-border-panel/30 text-text-primary rounded-tl-sm shadow-sm')
                     }`}>
                       {msg.content}
                     </div>
