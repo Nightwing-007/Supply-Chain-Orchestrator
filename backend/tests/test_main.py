@@ -3,10 +3,10 @@ Tests for FastAPI REST API (main.py)
 
 Covers:
   1. GET /health endpoint returns 200 OK.
-  2. POST /api/workflow returns 200 OK with mocked GlobalLogisticsState payload (Day 2 Mode).
+  2. POST /api/workflow returns 200 OK with mocked GlobalLogisticsState payload (Multi Agent Mode).
   3. POST /api/workflow 422 Unprocessable Entity on validation error.
   4. POST /api/workflow 500 Internal Server Error on orchestrator failure.
-  5. POST /api/agent/{agent_name} returns 200 OK with single agent state (Day 1 Mode).
+  5. POST /api/agent/{agent_name} returns 200 OK with single agent state (Single Agent Mode).
   6. POST /api/agent/{invalid_name} returns 404 Not Found.
 """
 
@@ -39,7 +39,7 @@ async def test_health_check_endpoint():
 
 
 # =============================================================
-#  Test 2: Workflow POST (Day 2 Mode)
+#  Test 2: Workflow POST (Multi Agent Mode)
 # =============================================================
 
 @pytest.mark.asyncio
@@ -131,7 +131,7 @@ async def test_workflow_post_internal_error(mock_run_workflow):
 
 
 # =============================================================
-#  Test 3: Standalone Single Agent POST (Day 1 Mode)
+#  Test 3: Standalone Single Agent POST (Single Agent Mode)
 # =============================================================
 
 @pytest.mark.asyncio

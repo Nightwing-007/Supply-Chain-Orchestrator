@@ -1,4 +1,6 @@
-import { useState, useEffect, useRef } from "react";
+import os
+
+content = """import { useState, useEffect, useRef } from "react";
 import { Search, Moon, Sun, ArrowRight, MessageSquare, Send, AlertTriangle, Package, Activity, Cpu, Database, Network, Server, User } from "lucide-react";
 import { runWorkflow, runSingleAgent, fetchDashboardData } from "./api";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, LineChart, Line } from "recharts";
@@ -20,13 +22,12 @@ export default function App() {
   const [chatInput, setChatInput] = useState("");
   const [agentState, setAgentState] = useState(null);
   
-  const [orchestratorMode, setOrchestratorMode] = useState("single");
+  const [orchestratorMode, setOrchestratorMode] = useState("multi");
   const [selectedSingleAgent, setSelectedSingleAgent] = useState("inventory");
   
   // Dashboard Data State
   const [dashboardData, setDashboardData] = useState(null);
   const [isLoadingDashboard, setIsLoadingDashboard] = useState(true);
-  const [isProfileOpen, setIsProfileOpen] = useState(false);
 
   const chatEndRef = useRef(null);
 
@@ -40,38 +41,6 @@ export default function App() {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isTyping]);
 
-<<<<<<< HEAD
-  const handleSend = async (e) => {
-    e.preventDefault();
-    const query = chatInput.trim();
-    if (!query) return;
-    
-    setMessages(prev => [...prev, { role: 'user', content: query }]);
-    setChatInput('');
-    setIsTyping(true);
-
-    try {
-      const response = await fetch('http://localhost:8000/api/workflow', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: query })
-      });
-      
-      const data = await response.json();
-      
-      if (response.ok && data.final_answer) {
-        setMessages(prev => [...prev, { role: 'bot', content: data.final_answer }]);
-      } else if (response.ok) {
-        setMessages(prev => [...prev, { role: 'bot', content: "Workflow executed successfully, but no final answer was provided." }]);
-      } else {
-        setMessages(prev => [...prev, { role: 'bot', content: `Error: ${data.detail || 'Failed to process request'}` }]);
-      }
-    } catch (error) {
-      setMessages(prev => [...prev, { role: 'bot', content: `Connection error: ${error.message}` }]);
-    } finally {
-      setIsTyping(false);
-    }
-=======
   useEffect(() => {
     const loadDashboard = async () => {
       try {
@@ -90,39 +59,26 @@ export default function App() {
     return () => clearInterval(interval);
   }, []);
 
-  const submitQuery = async (queryText) => {
-    if (!queryText.trim()) return;
-    setMessages(prev => [...prev, { role: 'user', content: queryText }]);
+  const handleSend = async (e) => {
+    e.preventDefault();
+    if (!chatInput.trim()) return;
+    
+    const query = chatInput.trim();
+    setMessages(prev => [...prev, { role: 'user', content: query }]);
+    setChatInput('');
     setIsTyping(true);
-    // ensure sidebar is visible if on mobile
-    if (window.innerWidth < 1024) {
-      document.querySelector('aside')?.scrollIntoView({ behavior: 'smooth' });
-    }
 
     try {
       let response;
       if (orchestratorMode === "multi") {
-        response = await runWorkflow(queryText);
+        response = await runWorkflow(query);
       } else {
-        response = await runSingleAgent(selectedSingleAgent, queryText, agentState || {});
+        response = await runSingleAgent(selectedSingleAgent, query, agentState || {});
       }
       
       setMessages(prev => [...prev, { 
         role: 'bot', 
-        content: (function() {
-  if (response.final_answer && !response.final_answer.startsWith("Standalone Single Agent")) return response.final_answer;
-  if (response.state && response.state[selectedSingleAgent]) {
-     const st = response.state[selectedSingleAgent];
-     if (st._adjustment_plan && st._adjustment_plan.summary) return st._adjustment_plan.summary;
-     if (st.analysis) return st.analysis;
-     if (st.message) return st.message;
-     if (st.summary) return st.summary;
-     if (Object.keys(st).length > 0) {
-       return `Agent executed successfully. Result:\n${JSON.stringify(st, null, 2)}`;
-     }
-  }
-  return response.final_answer || response.final_response || "Execution completed successfully.";
-})() 
+        content: response.final_response || response.message || "Execution completed successfully." 
       }]);
       
       if (response.state) {
@@ -141,14 +97,6 @@ export default function App() {
     } finally {
       setIsTyping(false);
     }
-  };
-
-  const handleSend = async (e) => {
-    e.preventDefault();
-    const text = chatInput;
-    setChatInput('');
-    await submitQuery(text);
->>>>>>> 9d03ee42b17ec70e97430cbd1826045c8a63df01
   };
 
   const renderDashboard = () => (
@@ -293,10 +241,10 @@ export default function App() {
               }`}>{risk.level}</h3>
               <p className="text-sm font-light leading-relaxed">{risk.text}</p>
               <div className="mt-4 flex gap-4">
-                <button onClick={() => submitQuery(`Create a mitigation plan for the following risk: ${risk.text}`)} className={`text-xs uppercase tracking-widest font-medium hover:opacity-70 transition-opacity ${
+                <button className={`text-xs uppercase tracking-widest font-medium hover:opacity-70 transition-opacity ${
                   risk.level === 'Critical' ? 'text-accent-critical' : 'text-accent-warning'
                 }`}>Mitigate</button>
-                <button onClick={() => submitQuery(`Provide more details and analysis for the following risk: ${risk.text}`)} className="text-xs uppercase tracking-widest font-medium text-text-secondary hover:text-text-primary transition-colors">Details</button>
+                <button className="text-xs uppercase tracking-widest font-medium text-text-secondary hover:text-text-primary transition-colors">Details</button>
               </div>
             </div>
           </div>
@@ -335,8 +283,7 @@ export default function App() {
                 <pre className="text-xs font-mono text-text-secondary">
                   {agentState && agentState[agent.id] 
                     ? JSON.stringify(agentState[agent.id], null, 2) 
-                    : `// No state available for ${agent.id}
-// Run a workflow via Gemini to populate.`}
+                    : `// No state available for ${agent.id}\n// Run a workflow via Gemini to populate.`}
                 </pre>
               </div>
             </div>
@@ -347,13 +294,13 @@ export default function App() {
   };
 
   return (
-    <div className="h-screen w-full flex flex-col lg:flex-row bg-bg-base text-text-primary font-sans font-light overflow-hidden">
+    <div className="h-screen w-full flex bg-bg-base text-text-primary font-sans font-light overflow-hidden">
       
       {/* LEFT COLUMN: MAIN STAGE */}
       <div className="flex-1 flex flex-col min-w-0 border-r border-border-panel">
         
         {/* Strictly Aligned Header */}
-        <header className="h-20 px-6 lg:px-16 flex items-center justify-between shrink-0 border-b border-border-panel">
+        <header className="h-20 px-16 flex items-center justify-between shrink-0 border-b border-border-panel">
           <div className="flex items-center gap-16">
             <div className="flex items-center gap-4 cursor-pointer group">
               <div className="w-5 h-5 bg-text-primary flex items-center justify-center group-hover:bg-accent-primary transition-colors rounded-sm">
@@ -362,7 +309,7 @@ export default function App() {
               <span className="font-medium tracking-tight text-lg">Orchestrator</span>
             </div>
             
-            <nav className="flex overflow-x-auto gap-6 lg:gap-10 text-sm hide-scrollbar">
+            <nav className="hidden md:flex gap-10 text-sm">
               {['Dashboard', 'Shipments', 'Risks', 'Agents'].map((tab) => (
                 <div key={tab} onClick={() => setActiveTab(tab)} className="relative cursor-pointer group h-20 flex items-center">
                   <span className={`transition-colors ${activeTab === tab ? 'text-text-primary font-medium' : 'text-text-secondary group-hover:text-text-primary'}`}>
@@ -377,36 +324,22 @@ export default function App() {
           </div>
           
           <div className="flex items-center gap-8 text-text-secondary">
-
+            <div className="hidden sm:flex items-center gap-3 cursor-pointer hover:text-text-primary transition-colors">
+              <Search size={16} />
+              <span className="text-sm">Search</span>
+              <span className="text-xs font-mono opacity-50">⌘K</span>
+            </div>
             <button onClick={() => setIsDark(!isDark)} className="hover:text-text-primary transition-colors cursor-pointer">
               {isDark ? <Sun size={16} /> : <Moon size={16} />}
             </button>
-            <div className="relative ml-2">
-              <div 
-                onClick={() => setIsProfileOpen(!isProfileOpen)}
-                className="w-8 h-8 bg-border-panel flex items-center justify-center cursor-pointer hover:opacity-80 transition-opacity rounded-full overflow-hidden"
-              >
-                <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix&backgroundColor=transparent" alt="User" className="w-full h-full opacity-80" />
-              </div>
-              
-              {isProfileOpen && (
-                <div className="absolute right-0 mt-3 w-48 bg-bg-panel border border-border-panel rounded-xl shadow-2xl py-2 z-50">
-                  <div className="px-4 py-2 border-b border-border-panel mb-1">
-                    <p className="text-sm font-medium">Logistics Admin</p>
-                    <p className="text-xs text-text-secondary truncate">admin@orchestrator.local</p>
-                  </div>
-                  <button onClick={() => { alert('Profile Settings feature coming soon!'); setIsProfileOpen(false); }} className="w-full text-left px-4 py-2 text-sm hover:bg-border-panel/30 transition-colors">Profile Settings</button>
-                  <button onClick={() => { alert('API Keys feature coming soon!'); setIsProfileOpen(false); }} className="w-full text-left px-4 py-2 text-sm hover:bg-border-panel/30 transition-colors">API Keys</button>
-                  <div className="border-t border-border-panel my-1"></div>
-                  <button onClick={() => { alert('User authentication not yet implemented.'); setIsProfileOpen(false); }} className="w-full text-left px-4 py-2 text-sm text-accent-critical hover:bg-accent-critical/10 transition-colors">Log Out</button>
-                </div>
-              )}
+            <div className="w-8 h-8 bg-border-panel flex items-center justify-center cursor-pointer hover:opacity-80 transition-opacity ml-2 rounded-full overflow-hidden">
+              <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix&backgroundColor=transparent" alt="User" className="w-full h-full opacity-80" />
             </div>
           </div>
         </header>
 
         {/* Content Area - Exact padding match with header */}
-        <main className="flex-1 overflow-y-auto px-6 lg:px-16 py-8 lg:py-12">
+        <main className="flex-1 overflow-y-auto px-16 py-12">
           {activeTab === "Dashboard" && renderDashboard()}
           {activeTab === "Shipments" && renderShipments()}
           {activeTab === "Risks" && renderRisks()}
@@ -415,10 +348,10 @@ export default function App() {
       </div>
 
       {/* RIGHT COLUMN: Gemini - Fixed width, strictly aligned padding */}
-      <aside className="w-full lg:w-[420px] h-[50vh] lg:h-full flex flex-col shrink-0 bg-bg-base border-t lg:border-t-0 lg:border-l border-border-panel shadow-2xl z-10">
+      <aside className="w-[420px] flex flex-col shrink-0 bg-bg-base border-l border-border-panel shadow-2xl z-10">
         
         <div className="h-20 px-10 flex items-center justify-between shrink-0 border-b border-border-panel">
-          <span className="text-sm font-medium tracking-tight">CHAT</span>
+          <span className="text-sm font-medium tracking-tight">Gemini</span>
           <div className="flex items-center gap-2 bg-border-panel/30 p-1 rounded-md">
             <button 
               onClick={() => setOrchestratorMode('single')}
@@ -426,12 +359,12 @@ export default function App() {
             >
               Single Agent
             </button>
-            {/* <button 
+            <button 
               onClick={() => setOrchestratorMode('multi')}
               className={`text-xs px-2 py-1 rounded transition-colors ${orchestratorMode === 'multi' ? 'bg-bg-panel shadow-sm text-text-primary font-medium' : 'text-text-secondary hover:text-text-primary'}`}
             >
               Multi Agent
-            </button> */}
+            </button>
           </div>
         </div>
 
@@ -469,9 +402,9 @@ export default function App() {
                 {messages.map((msg, i) => (
                   <div key={i} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'} gap-2`}>
                     <div className="text-[10px] font-medium uppercase tracking-widest text-text-secondary">
-                      {msg.role === 'user' ? 'You' : 'CHAT'}
+                      {msg.role === 'user' ? 'You' : 'Gemini'}
                     </div>
-                    <div className={`p-4 max-w-[90%] font-light leading-relaxed border rounded-2xl whitespace-pre-wrap break-words ${
+                    <div className={`p-4 max-w-[90%] font-light leading-relaxed border rounded-2xl ${
                       msg.role === 'user' 
                         ? 'border-text-primary bg-text-primary text-bg-base rounded-tr-sm' 
                         : 'border-border-panel bg-border-panel/30 text-text-primary rounded-tl-sm shadow-sm'
@@ -482,7 +415,7 @@ export default function App() {
                 ))}
                 {isTyping && (
                   <div className="flex flex-col items-start gap-2">
-                    <div className="text-[10px] font-medium uppercase tracking-widest text-text-secondary">CHAT</div>
+                    <div className="text-[10px] font-medium uppercase tracking-widest text-text-secondary">Gemini</div>
                     <div className="px-5 py-4 border border-border-panel bg-border-panel/30 rounded-2xl rounded-tl-sm flex items-center gap-2 shadow-sm">
                       <div className="w-1.5 h-1.5 bg-text-secondary rounded-full animate-pulse" style={{ animationDelay: '0ms' }}></div>
                       <div className="w-1.5 h-1.5 bg-text-secondary rounded-full animate-pulse" style={{ animationDelay: '150ms' }}></div>
@@ -501,7 +434,7 @@ export default function App() {
                 type="text"
                 value={chatInput}
                 onChange={(e) => setChatInput(e.target.value)}
-                placeholder={orchestratorMode === 'multi' ? "Ask CHAT to run a workflow..." : `Talk to ${AGENTS.find(a => a.id === selectedSingleAgent)?.name}...`}
+                placeholder={orchestratorMode === 'multi' ? "Ask Gemini to run a workflow..." : `Talk to ${AGENTS.find(a => a.id === selectedSingleAgent)?.name}...`}
                 className="w-full bg-transparent text-sm focus:outline-none placeholder:text-text-placeholder pr-8 border-b border-border-panel focus:border-text-primary transition-colors py-3"
               />
               <button
@@ -520,3 +453,7 @@ export default function App() {
     </div>
   );
 }
+"""
+with open(r'f:\agentverse\Supply-Chain-Orchestrator\ui\src\App.jsx', 'w', encoding='utf-8') as f:
+    f.write(content)
+print('Updated App.jsx successfully.')

@@ -1,0 +1,443 @@
+import os
+
+content = """import { useState, useEffect, useRef } from "react";
+import { Search, Moon, Sun, ArrowRight, MessageSquare, Send, AlertTriangle, Package, Activity, Cpu, Database, Network, Server, User } from "lucide-react";
+import { runWorkflow, runSingleAgent } from "./api";
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, LineChart, Line } from "recharts";
+
+const performanceData = [
+  { name: 'Mon', value: 40 },
+  { name: 'Tue', value: 60 },
+  { name: 'Wed', value: 45 },
+  { name: 'Thu', value: 80 },
+  { name: 'Fri', value: 50 },
+  { name: 'Sat', value: 90 },
+  { name: 'Sun', value: 75 },
+];
+
+const flowData = [
+  { name: 'Node A', out: 400, in: 240 },
+  { name: 'Node B', out: 300, in: 139 },
+  { name: 'Node C', out: 200, in: 980 },
+  { name: 'Node D', out: 278, in: 390 },
+  { name: 'Node E', out: 189, in: 480 },
+  { name: 'Node F', out: 239, in: 380 },
+  { name: 'Node G', out: 349, in: 430 },
+];
+
+const AGENTS = [
+  { id: 'inventory', name: 'Inventory Planning', icon: Database, color: 'text-accent-primary' },
+  { id: 'warehouse', name: 'Warehouse Ops', icon: Package, color: 'text-accent-success' },
+  { id: 'demand', name: 'Demand Forecasting', icon: Activity, color: 'text-accent-warning' },
+  { id: 'route', name: 'Route Optimization', icon: Network, color: 'text-accent-primary' },
+  { id: 'fleet', name: 'Fleet Management', icon: Cpu, color: 'text-accent-critical' },
+  { id: 'notification', name: 'Customer Notification', icon: MessageSquare, color: 'text-accent-success' },
+];
+
+export default function App() {
+  const [isDark, setIsDark] = useState(true);
+  const [activeTab, setActiveTab] = useState("Dashboard");
+  const [messages, setMessages] = useState([]);
+  const [isTyping, setIsTyping] = useState(false);
+  const [chatInput, setChatInput] = useState("");
+  const [agentState, setAgentState] = useState(null);
+  
+  // New States for Single vs Multi Agent Mode
+  const [orchestratorMode, setOrchestratorMode] = useState("multi"); // "multi" or "single"
+  const [selectedSingleAgent, setSelectedSingleAgent] = useState("inventory");
+  
+  const chatEndRef = useRef(null);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    if (isDark) root.classList.add("dark");
+    else root.classList.remove("dark");
+  }, [isDark]);
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, isTyping]);
+
+  const handleSend = async (e) => {
+    e.preventDefault();
+    if (!chatInput.trim()) return;
+    
+    const query = chatInput.trim();
+    setMessages(prev => [...prev, { role: 'user', content: query }]);
+    setChatInput('');
+    setIsTyping(true);
+
+    try {
+      let response;
+      if (orchestratorMode === "multi") {
+        response = await runWorkflow(query);
+      } else {
+        response = await runSingleAgent(selectedSingleAgent, query, agentState || {});
+      }
+      
+      setMessages(prev => [...prev, { 
+        role: 'bot', 
+        content: response.final_response || response.message || "Execution completed successfully." 
+      }]);
+      
+      if (response.state) {
+         setAgentState(response.state);
+      } else if (response.agent_state) {
+         // Fallback for single agent response structure
+         setAgentState(prev => ({
+           ...prev,
+           [selectedSingleAgent]: response.agent_state
+         }));
+      }
+    } catch (err) {
+      setMessages(prev => [...prev, { 
+        role: 'bot', 
+        content: "Error connecting to backend. Please ensure the FastAPI server is running and the database is configured." 
+      }]);
+    } finally {
+      setIsTyping(false);
+    }
+  };
+
+  const renderDashboard = () => (
+    <>
+      <header className="mb-16">
+        <h1 className="text-4xl font-light tracking-tight mb-2">Live Telemetry</h1>
+        <p className="text-text-secondary">Monitoring global supply chain metrics.</p>
+      </header>
+
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-x-16 gap-y-16">
+        <section className="xl:col-span-2">
+          <div className="flex items-end justify-between mb-4 border-b border-border-panel pb-3">
+            <h2 className="text-sm font-medium tracking-wide text-text-secondary uppercase">Route Tracking (Load over time)</h2>
+            <span className="text-xs font-mono text-text-secondary text-accent-primary">ACTIVE</span>
+          </div>
+          <div className="h-[400px] w-full flex flex-col items-center justify-center bg-border-panel/10 p-4 rounded-xl border border-border-panel">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={flowData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="colorOut" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="var(--color-accent-primary)" stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor="var(--color-accent-primary)" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-panel)" vertical={false} />
+                <XAxis dataKey="name" stroke="var(--color-text-secondary)" fontSize={12} tickLine={false} axisLine={false} />
+                <YAxis stroke="var(--color-text-secondary)" fontSize={12} tickLine={false} axisLine={false} />
+                <Tooltip 
+                  contentStyle={{ backgroundColor: 'var(--color-bg-panel)', borderColor: 'var(--color-border-panel)', color: 'var(--color-text-primary)' }}
+                  itemStyle={{ color: 'var(--color-text-primary)' }}
+                />
+                <Area type="monotone" dataKey="out" stroke="var(--color-accent-primary)" fillOpacity={1} fill="url(#colorOut)" />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </section>
+
+        <section>
+          <div className="flex items-end justify-between mb-4 border-b border-border-panel pb-3">
+            <h2 className="text-sm font-medium tracking-wide text-text-secondary uppercase">Performance</h2>
+            <span className="text-xs text-text-secondary">Last 7 Days</span>
+          </div>
+          <div className="h-48 w-full bg-border-panel/10 p-4 rounded-xl border border-border-panel">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={performanceData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-panel)" vertical={false} />
+                <XAxis dataKey="name" stroke="var(--color-text-secondary)" fontSize={12} tickLine={false} axisLine={false} />
+                <Tooltip 
+                  contentStyle={{ backgroundColor: 'var(--color-bg-panel)', borderColor: 'var(--color-border-panel)', color: 'var(--color-text-primary)' }}
+                />
+                <Line type="monotone" dataKey="value" stroke="var(--color-accent-success)" strokeWidth={2} dot={{ r: 4, fill: 'var(--color-bg-panel)' }} activeDot={{ r: 6 }} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </section>
+
+        <section>
+          <div className="flex items-end justify-between mb-4 border-b border-border-panel pb-3">
+            <h2 className="text-sm font-medium tracking-wide text-text-secondary uppercase">Flow Analysis</h2>
+            <button className="text-xs text-text-primary hover:underline uppercase tracking-wider font-medium">Interact</button>
+          </div>
+          <div className="h-48 w-full bg-border-panel/10 p-4 rounded-xl border border-border-panel">
+             <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={flowData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-panel)" vertical={false} />
+                <XAxis dataKey="name" stroke="var(--color-text-secondary)" fontSize={12} tickLine={false} axisLine={false} />
+                <Tooltip 
+                  contentStyle={{ backgroundColor: 'var(--color-bg-panel)', borderColor: 'var(--color-border-panel)' }}
+                />
+                <Line type="monotone" dataKey="in" stroke="var(--color-accent-warning)" strokeWidth={2} dot={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </section>
+      </div>
+    </>
+  );
+
+  const renderShipments = () => (
+    <>
+      <header className="mb-16">
+        <h1 className="text-4xl font-light tracking-tight mb-2">Active Shipments</h1>
+        <p className="text-text-secondary">Tracking {agentState?.shipments ? agentState.shipments.length : "1,284"} ongoing freight movements.</p>
+      </header>
+
+      <div className="w-full">
+        <div className="grid grid-cols-5 border-b border-border-panel pb-4 mb-4 text-xs font-medium tracking-widest text-text-secondary uppercase">
+          <div className="col-span-2">Shipment ID</div>
+          <div>Origin</div>
+          <div>Destination</div>
+          <div className="text-right">Status</div>
+        </div>
+        <div className="space-y-2">
+          {[1, 2, 3, 4, 5].map((item) => (
+            <div key={item} className="grid grid-cols-5 items-center border-b border-border-panel/50 pb-4 pt-2 text-sm">
+              <div className="col-span-2 flex items-center gap-3">
+                <Package size={16} className="text-text-secondary" />
+                <span className="font-mono">SHP-293{item}4X</span>
+              </div>
+              <div className="text-text-secondary">Shanghai, CN</div>
+              <div className="text-text-secondary">Rotterdam, NL</div>
+              <div className="text-right flex items-center justify-end gap-2 text-accent-primary">
+                <Activity size={14} />
+                <span>In Transit</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </>
+  );
+
+  const renderRisks = () => (
+    <>
+      <header className="mb-16">
+        <h1 className="text-4xl font-light tracking-tight mb-2">Risk Intel</h1>
+        <p className="text-text-secondary">Automated vulnerability and disruption tracking.</p>
+      </header>
+
+      <div className="space-y-6">
+        {[
+          { level: 'Critical', text: 'Port Congestion at Long Beach expected to delay 4 inbound vessels by 72h.', icon: AlertTriangle, color: 'text-accent-critical', bg: 'bg-accent-critical/10', border: 'border-accent-critical/20' },
+          { level: 'Warning', text: 'Typhoon approaching South China Sea, potential rerouting for 12 shipments.', icon: AlertTriangle, color: 'text-accent-warning', bg: 'bg-accent-warning/10', border: 'border-accent-warning/20' }
+        ].map((risk, i) => (
+          <div key={i} className={`p-6 border ${risk.border} ${risk.bg} flex items-start gap-4 rounded-xl`}>
+            <risk.icon size={20} className={risk.color} />
+            <div>
+              <h3 className={`text-sm font-medium uppercase tracking-wider mb-2 ${risk.color}`}>{risk.level}</h3>
+              <p className="text-sm font-light leading-relaxed">{risk.text}</p>
+              <div className="mt-4 flex gap-4">
+                <button className={`text-xs uppercase tracking-widest font-medium ${risk.color} hover:opacity-70 transition-opacity`}>Mitigate</button>
+                <button className="text-xs uppercase tracking-widest font-medium text-text-secondary hover:text-text-primary transition-colors">Details</button>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </>
+  );
+
+  const renderAgents = () => {
+    return (
+      <>
+        <header className="mb-16">
+          <h1 className="text-4xl font-light tracking-tight mb-2">Agent State Inspector</h1>
+          <p className="text-text-secondary">Real-time status and internal state of all 6 AI orchestrator agents.</p>
+        </header>
+
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+          {AGENTS.map((agent) => (
+            <div key={agent.id} className="p-6 border border-border-panel bg-border-panel/10 rounded-xl flex flex-col gap-4 shadow-sm">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className={`p-2 bg-border-panel/30 rounded-lg ${agent.color}`}>
+                    <agent.icon size={20} />
+                  </div>
+                  <h3 className="font-medium tracking-wide">{agent.name}</h3>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="relative flex h-2.5 w-2.5">
+                    <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${agentState && agentState[agent.id] ? 'bg-accent-success' : 'bg-accent-warning'}`}></span>
+                    <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${agentState && agentState[agent.id] ? 'bg-accent-success' : 'bg-accent-warning'}`}></span>
+                  </span>
+                  <span className="text-xs uppercase tracking-widest text-text-secondary">{agentState && agentState[agent.id] ? 'Idle' : 'Awaiting Workflow'}</span>
+                </div>
+              </div>
+              <div className="mt-2 bg-bg-base border border-border-panel rounded-lg p-4 overflow-x-auto h-48 custom-scrollbar">
+                <pre className="text-xs font-mono text-text-secondary">
+                  {agentState && agentState[agent.id] 
+                    ? JSON.stringify(agentState[agent.id], null, 2) 
+                    : `// No state available for ${agent.id}\n// Run a workflow via Gemini to populate.`}
+                </pre>
+              </div>
+            </div>
+          ))}
+        </div>
+      </>
+    );
+  };
+
+  return (
+    <div className="h-screen w-full flex bg-bg-base text-text-primary font-sans font-light overflow-hidden">
+      
+      {/* LEFT COLUMN: MAIN STAGE */}
+      <div className="flex-1 flex flex-col min-w-0 border-r border-border-panel">
+        
+        {/* Strictly Aligned Header */}
+        <header className="h-20 px-16 flex items-center justify-between shrink-0 border-b border-border-panel">
+          <div className="flex items-center gap-16">
+            <div className="flex items-center gap-4 cursor-pointer group">
+              <div className="w-5 h-5 bg-text-primary flex items-center justify-center group-hover:bg-accent-primary transition-colors rounded-sm">
+                <div className="w-1.5 h-1.5 bg-bg-base"></div>
+              </div>
+              <span className="font-medium tracking-tight text-lg">Orchestrator</span>
+            </div>
+            
+            <nav className="hidden md:flex gap-10 text-sm">
+              {['Dashboard', 'Shipments', 'Risks', 'Agents'].map((tab) => (
+                <div key={tab} onClick={() => setActiveTab(tab)} className="relative cursor-pointer group h-20 flex items-center">
+                  <span className={`transition-colors ${activeTab === tab ? 'text-text-primary font-medium' : 'text-text-secondary group-hover:text-text-primary'}`}>
+                    {tab}
+                  </span>
+                  {activeTab === tab && (
+                    <div className="absolute bottom-0 left-0 w-full h-[2px] bg-text-primary"></div>
+                  )}
+                </div>
+              ))}
+            </nav>
+          </div>
+          
+          <div className="flex items-center gap-8 text-text-secondary">
+            <div className="hidden sm:flex items-center gap-3 cursor-pointer hover:text-text-primary transition-colors">
+              <Search size={16} />
+              <span className="text-sm">Search</span>
+              <span className="text-xs font-mono opacity-50">⌘K</span>
+            </div>
+            <button onClick={() => setIsDark(!isDark)} className="hover:text-text-primary transition-colors cursor-pointer">
+              {isDark ? <Sun size={16} /> : <Moon size={16} />}
+            </button>
+            <div className="w-8 h-8 bg-border-panel flex items-center justify-center cursor-pointer hover:opacity-80 transition-opacity ml-2 rounded-full overflow-hidden">
+              <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix&backgroundColor=transparent" alt="User" className="w-full h-full opacity-80" />
+            </div>
+          </div>
+        </header>
+
+        {/* Content Area - Exact padding match with header */}
+        <main className="flex-1 overflow-y-auto px-16 py-12">
+          {activeTab === "Dashboard" && renderDashboard()}
+          {activeTab === "Shipments" && renderShipments()}
+          {activeTab === "Risks" && renderRisks()}
+          {activeTab === "Agents" && renderAgents()}
+        </main>
+      </div>
+
+      {/* RIGHT COLUMN: Gemini - Fixed width, strictly aligned padding */}
+      <aside className="w-[420px] flex flex-col shrink-0 bg-bg-base border-l border-border-panel shadow-2xl z-10">
+        
+        <div className="h-20 px-10 flex items-center justify-between shrink-0 border-b border-border-panel">
+          <span className="text-sm font-medium tracking-tight">Gemini</span>
+          <div className="flex items-center gap-2 bg-border-panel/30 p-1 rounded-md">
+            <button 
+              onClick={() => setOrchestratorMode('single')}
+              className={`text-xs px-2 py-1 rounded transition-colors ${orchestratorMode === 'single' ? 'bg-bg-panel shadow-sm text-text-primary font-medium' : 'text-text-secondary hover:text-text-primary'}`}
+            >
+              Single Agent
+            </button>
+            <button 
+              onClick={() => setOrchestratorMode('multi')}
+              className={`text-xs px-2 py-1 rounded transition-colors ${orchestratorMode === 'multi' ? 'bg-bg-panel shadow-sm text-text-primary font-medium' : 'text-text-secondary hover:text-text-primary'}`}
+            >
+              Multi Agent
+            </button>
+          </div>
+        </div>
+
+        {orchestratorMode === 'single' && (
+          <div className="px-10 py-4 border-b border-border-panel shrink-0 bg-border-panel/5 flex items-center gap-4">
+            <span className="text-xs font-medium text-text-secondary uppercase tracking-widest">Select Agent:</span>
+            <select 
+              value={selectedSingleAgent}
+              onChange={(e) => setSelectedSingleAgent(e.target.value)}
+              className="bg-bg-panel text-text-primary text-sm p-1.5 rounded border border-border-panel focus:outline-none focus:border-text-primary flex-1"
+            >
+              {AGENTS.map(agent => (
+                <option key={agent.id} value={agent.id}>{agent.name}</option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        <div className="flex-1 flex flex-col overflow-hidden">
+          
+          <div className="flex-1 overflow-y-auto px-10 py-8 flex flex-col gap-6 text-sm">
+            {messages.length === 0 ? (
+              <div className="flex-1 flex flex-col justify-end text-text-secondary">
+                <div className="space-y-5 w-full">
+                  {['Check inventory for Warehouse A', 'Run route optimization', 'Analyze demand forecast'].map((action) => (
+                    <div key={action} onClick={() => setChatInput(action)} className="flex items-center gap-4 cursor-pointer hover:text-text-primary transition-colors group pb-2 border-b border-transparent hover:border-border-panel">
+                      <ArrowRight size={14} className="opacity-0 group-hover:opacity-100 transition-opacity text-text-primary" />
+                      <span className="text-sm font-light">{action}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <>
+                {messages.map((msg, i) => (
+                  <div key={i} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'} gap-2`}>
+                    <div className="text-[10px] font-medium uppercase tracking-widest text-text-secondary">
+                      {msg.role === 'user' ? 'You' : 'Gemini'}
+                    </div>
+                    <div className={`p-4 max-w-[90%] font-light leading-relaxed border rounded-2xl ${
+                      msg.role === 'user' 
+                        ? 'border-text-primary bg-text-primary text-bg-base rounded-tr-sm' 
+                        : 'border-border-panel bg-border-panel/30 text-text-primary rounded-tl-sm shadow-sm'
+                    }`}>
+                      {msg.content}
+                    </div>
+                  </div>
+                ))}
+                {isTyping && (
+                  <div className="flex flex-col items-start gap-2">
+                    <div className="text-[10px] font-medium uppercase tracking-widest text-text-secondary">Gemini</div>
+                    <div className="px-5 py-4 border border-border-panel bg-border-panel/30 rounded-2xl rounded-tl-sm flex items-center gap-2 shadow-sm">
+                      <div className="w-1.5 h-1.5 bg-text-secondary rounded-full animate-pulse" style={{ animationDelay: '0ms' }}></div>
+                      <div className="w-1.5 h-1.5 bg-text-secondary rounded-full animate-pulse" style={{ animationDelay: '150ms' }}></div>
+                      <div className="w-1.5 h-1.5 bg-text-secondary rounded-full animate-pulse" style={{ animationDelay: '300ms' }}></div>
+                    </div>
+                  </div>
+                )}
+                <div ref={chatEndRef} />
+              </>
+            )}
+          </div>
+
+          <div className="px-10 py-6 shrink-0 border-t border-border-panel bg-bg-base">
+            <form onSubmit={handleSend} className="relative flex items-center">
+              <input
+                type="text"
+                value={chatInput}
+                onChange={(e) => setChatInput(e.target.value)}
+                placeholder={orchestratorMode === 'multi' ? "Ask Gemini to run a workflow..." : `Talk to ${AGENTS.find(a => a.id === selectedSingleAgent)?.name}...`}
+                className="w-full bg-transparent text-sm focus:outline-none placeholder:text-text-placeholder pr-8 border-b border-border-panel focus:border-text-primary transition-colors py-3"
+              />
+              <button
+                type="submit"
+                disabled={!chatInput.trim() || isTyping}
+                className="absolute right-0 text-text-secondary hover:text-text-primary disabled:opacity-0 transition-colors cursor-pointer"
+              >
+                <Send size={16} />
+              </button>
+            </form>
+          </div>
+
+        </div>
+      </aside>
+
+    </div>
+  );
+}
+"""
+with open(r'f:\agentverse\Supply-Chain-Orchestrator\ui\src\App.jsx', 'w', encoding='utf-8') as f:
+    f.write(content)
+print('Updated App.jsx successfully.')
