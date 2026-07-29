@@ -81,14 +81,14 @@ Edit `.env` and configure your credentials:
 # Note: If your password contains special characters like '@', URL-encode them (e.g. '@' becomes '%40')
 DATABASE_URL=postgresql://postgres:your_password@localhost:5432/supply_chain
 
-# ── Google Gemini API ───────────────────────────────────────
-GOOGLE_API_KEY=your_actual_google_gemini_api_key
-GEMINI_MODEL=gemini-2.5-flash
-
-# ── GitHub Models (Fallback LLM) ─────────────────────────────
+# ── Primary LLM: GitHub Models (OpenAI-compatible) ──────────
 GITHUB_TOKEN=your_actual_github_token
 GITHUB_MODELS_ENDPOINT=https://models.inference.ai.azure.com
 GITHUB_MODEL=gpt-4o-mini
+
+# ── Secondary Fallback LLM: Google Gemini ───────────────────
+GOOGLE_API_KEY=your_actual_google_gemini_api_key
+GEMINI_MODEL=gemini-2.0-flash
 
 # ── Application Settings ─────────────────────────────────────
 LOG_LEVEL=INFO
@@ -114,17 +114,17 @@ psql -U postgres -c "CREATE DATABASE supply_chain;"
 **Option A: From Terminal (PowerShell / Command Prompt)**
 ```powershell
 # Apply DDL Schema
-psql -U postgres -d supply_chain -f db/schema.sql
+psql -U postgres -d supply_chain -f backend/db/schema.sql
 
 # Insert Seed Dataset
-psql -U postgres -d supply_chain -f db/seed.sql
+psql -U postgres -d supply_chain -f backend/db/seed.sql
 ```
 
 **Option B: From inside the `psql` Interactive Prompt (`supply_chain=#`)**
 ```sql
 \c supply_chain
-\i c:/Users/deepa/Downloads/AgentVerse/db/schema.sql
-\i c:/Users/deepa/Downloads/AgentVerse/db/seed.sql
+\i db/schema.sql
+\i db/seed.sql
 ```
 
 ### Step 4.3: Verify Database Tables
@@ -157,31 +157,28 @@ Expected output:
 
 ## 5. Running the Application (Dual-Terminal Setup)
 
-To run the complete platform, open **two separate PowerShell terminals** in the `AgentVerse` directory:
+To run the complete platform, open **two separate terminals**:
 
 ### Terminal 1: Launch FastAPI Backend Server
 
 ```powershell
-# 1. Activate virtual environment
-.\.venv\Scripts\activate
-
-# 2. Start FastAPI REST Server
+cd backend
+.\venv\Scripts\activate
 python main.py
 ```
 - **Backend API:** `http://localhost:8000`
 - **Swagger Interactive API Docs:** `http://localhost:8000/docs`
 - **Health Check Probe:** `http://localhost:8000/health`
 
-### Terminal 2: Launch Streamlit Dashboard Frontend
+### Terminal 2: Launch React 19 Frontend UI
 
 ```powershell
-# 1. Activate virtual environment
-.\.venv\Scripts\activate
-
-# 2. Start Streamlit UI
-streamlit run frontend/app.py
+cd ui
+npm install
+npm run dev
 ```
-- **Frontend Dashboard:** `http://localhost:8501`
+- **Frontend Dashboard & Chat:** `http://localhost:5173`
+- Features interactive telemetry charts, single/multi-agent mode toggle, and rich Markdown rendering (`react-markdown`).
 
 ---
 
