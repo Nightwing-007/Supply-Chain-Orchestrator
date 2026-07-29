@@ -211,11 +211,18 @@ DEFAULT_ENVIRONMENTAL_CONSTRAINTS = [
 ]
 
 SYSTEM_INSTRUCTION = """You are a Senior Logistics Dispatcher and Route Optimisation Specialist.
-Analyse the algorithmic baseline route sequence and live environmental hazards.
-Dynamically re-sequence or adjust the route to bypass traffic jams, weather hazards, and satisfy urgent order SLA deadlines.
+Analyse algorithmic baseline route sequences and live environmental hazards.
+Dynamically re-sequence or adjust routes to bypass traffic jams, weather hazards, and satisfy urgent order SLA deadlines.
+
+DOMAIN GUARDRAILS:
+Evaluate the user's query. If the query is completely unrelated to your specific domain (Route Optimization, delivery routing, traffic/weather hazards, dispatch sequence, ETAs), you MUST NOT process the state data or generate your standard report. Instead, return a polite message stating that this task is outside your scope as the Route Optimization Agent in the "summary" field, leave "optimized_stop_sequence", "avoided_hazards", and "estimated_delay_warnings" empty [], and explicitly suggest which of the other specific agents (Inventory Planning, Warehouse Ops, Demand Forecasting, Fleet Management, Customer Notification) they should select from the dropdown, or suggest switching to the Multi-Agent Supervisor.
+
 Always respond with valid JSON matching the exact schema provided."""
 
-DYNAMIC_ROUTE_PROMPT_TEMPLATE = """Analyse the following algorithmic baseline route sequence and live environmental constraints to produce a Dynamic Route Adjustment Plan.
+DYNAMIC_ROUTE_PROMPT_TEMPLATE = """Analyse the following user request, baseline route sequence, and live environmental constraints to produce a Dynamic Route Adjustment Plan or evaluate domain relevance.
+
+## User Request / Query
+{user_query}
 
 ## Origin Warehouse / Starting Location
 {origin_json}
@@ -256,11 +263,12 @@ Return a JSON object with this exact structure:
     "revised_total_distance_km": <float>,
     "revised_total_duration_min": <int>
   }},
-  "summary": "<one-paragraph executive summary of the dispatch adjustments>"
+  "summary": "<executive summary of dispatch adjustments if in-domain, OR a polite out-of-scope redirection message if the user query is completely unrelated to Route Optimization>"
 }}
 
 Rules:
-- Prioritise high-priority orders and tight promised_at deadlines.
+- If the query is unrelated to Route Optimization, set "optimized_stop_sequence", "avoided_hazards", and "estimated_delay_warnings" to [], and provide the polite out-of-scope rejection and redirection in "summary".
+- Prioritise high-priority orders and tight promised_at deadlines when in-domain.
 - Avoid or re-sequence stops affected by severe traffic or weather hazards.
 - Retain all stops -- do not drop any delivery orders.
 """
@@ -388,7 +396,9 @@ async def route_optimization_agent(
             llm_service = LLMService()
 
         try:
+            user_query = state.get("query", "Optimize delivery routes.")
             prompt = DYNAMIC_ROUTE_PROMPT_TEMPLATE.format(
+                user_query=user_query,
                 origin_json=json.dumps(origin_wh, indent=2),
                 baseline_route_json=json.dumps(baseline_route, indent=2),
                 environmental_json=json.dumps(env_constraints, indent=2),
@@ -439,6 +449,7 @@ async def route_optimization_agent(
                 "total_distance_km": revised_dist,
                 "total_duration_min": revised_dur,
                 "optimized_order": optimized_order_ids,
+                "summary": adjustment_result.get("summary", ""),
                 # Extended metadata
                 "_vehicle_info": assigned_vehicle,
                 "_origin_warehouse": origin_wh,

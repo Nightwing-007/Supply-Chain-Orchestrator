@@ -146,15 +146,18 @@ def build_templated_notification(
 #  LLM Integration
 # =============================================================
 
-SYSTEM_INSTRUCTION = """You are an Empathetic Customer Success Representative and Communications Manager.
+SYSTEM_INSTRUCTION = """You are an Empathetic Customer Success Representative and Communications Manager specializing in customer notifications.
 Draft tailored, professional Email and SMS messages for logistics customer notifications.
-Dynamically adjust your tone based on operational news:
-- Apologetic and reassuring for delays, backorders, or disruptions
-- Enthusiastic and warm for successful deliveries or dispatches
-- Clear and professional for status updates
+
+DOMAIN GUARDRAILS:
+Evaluate the user's query. If the query is completely unrelated to your specific domain (Customer Notification, customer communications, email/SMS drafting, order status updates), you MUST NOT process the state data or generate a standard customer notification draft. Instead, return a polite message stating that this task is outside your scope as the Customer Notification Agent in the "summary" field and in the email "body", and explicitly suggest which of the other specific agents (Inventory Planning, Warehouse Ops, Demand Forecasting, Route Optimization, Fleet Management) they should select from the dropdown, or suggest switching to the Multi-Agent Supervisor.
+
 Always respond with valid JSON matching the exact schema provided."""
 
-NOTIFICATION_PROMPT_TEMPLATE = """Draft a Communication Draft Plan for the following order notification context.
+NOTIFICATION_PROMPT_TEMPLATE = """Draft a Communication Draft Plan for the following user request and order notification context, or evaluate domain relevance.
+
+## User Request / Query
+{user_query}
 
 ## Order Information
 - Order Number: {order_number}
@@ -177,7 +180,7 @@ Return a JSON object with this exact structure:
   "communication_plan": {{
     "email": {{
       "subject": "<compelling, context-appropriate subject line>",
-      "body": "<professional, well-structured email body with greeting and sign-off>"
+      "body": "<professional email body OR polite out-of-scope redirection message if user query is unrelated to Customer Notification>"
     }},
     "sms": {{
       "body": "<concise SMS message under 160 characters>"
@@ -185,13 +188,13 @@ Return a JSON object with this exact structure:
     "tone": "<apologetic|enthusiastic|informative|reassuring>",
     "action_taken": "<description of dispatch communication strategy>"
   }},
-  "summary": "<one-sentence summary of the customer notification draft>"
+  "summary": "<one-sentence summary of the customer notification draft if in-domain, OR a polite out-of-scope redirection message if the user query is completely unrelated to Customer Notification>"
 }}
 
 Rules:
-- Keep the SMS body strictly under 160 characters.
-- Ensure the customer's name and order number are included in both Email and SMS.
-- If there is a delay or exception, acknowledge the issue directly and express genuine empathy.
+- If the query is unrelated to Customer Notification, place the polite out-of-scope rejection and redirection in "summary" and email "body".
+- Keep the SMS body strictly under 160 characters when in-domain.
+- Ensure the customer's name and order number are included in both Email and SMS when in-domain.
 """
 
 
@@ -272,7 +275,9 @@ async def customer_notification_agent(
             llm_service = LLMService()
 
         try:
+            user_query = state.get("query", "Draft customer notification.")
             prompt = NOTIFICATION_PROMPT_TEMPLATE.format(
+                user_query=user_query,
                 order_number=order_data["order_number"],
                 customer_name=order_data["customer_name"],
                 customer_email=order_data.get("customer_email", "customer@example.com"),
@@ -326,6 +331,7 @@ async def customer_notification_agent(
         comm_plan = comm_result.get("communication_plan", {})
         email_data = comm_plan.get("email", {})
         sms_data = comm_plan.get("sms", {})
+        summary_text = comm_result.get("summary", "")
 
         result: dict[str, Any] = {
             "notification": {
@@ -335,7 +341,9 @@ async def customer_notification_agent(
                 "customer_phone": order_data.get("customer_phone", ""),
                 "channel": order_data.get("channel", "email"),
                 "event_type": event_reason if event_reason else "order_update",
+                "message": email_data.get("body") or summary_text,
                 "message_body": email_data.get("body", ""),
+                "summary": summary_text,
                 "notification_id": notif_id,
                 # Extended metadata
                 "_email_subject": email_data.get("subject", ""),

@@ -265,13 +265,18 @@ def build_baseline_forecasts(
 #  LLM Integration
 # =============================================================
 
-SYSTEM_INSTRUCTION = """You are a senior supply chain demand planner with expertise in
-statistical forecasting and market trend analysis.
-Analyse the algorithmic baseline forecasts and apply qualitative adjustments
-based on trends, seasonality, and volatility signals.
+SYSTEM_INSTRUCTION = """You are a senior supply chain demand planner specializing in statistical forecasting and market trend analysis.
+Analyse algorithmic baseline forecasts and apply qualitative adjustments based on trends, seasonality, and volatility signals.
+
+DOMAIN GUARDRAILS:
+Evaluate the user's query. If the query is completely unrelated to your specific domain (Demand Forecasting, sales trends, historical sales analysis, sales volatility), you MUST NOT process the state data or generate your standard report. Instead, return a polite message stating that this task is outside your scope as the Demand Forecasting Agent in the "summary" field, leave "adjusted_forecasts" and "market_insights" empty [], and explicitly suggest which of the other specific agents (Inventory Planning, Warehouse Ops, Route Optimization, Fleet Management, Customer Notification) they should select from the dropdown, or suggest switching to the Multi-Agent Supervisor.
+
 Always respond with valid JSON matching the schema provided."""
 
-ADJUSTMENT_PROMPT_TEMPLATE = """Analyse the following algorithmic baseline demand forecasts and produce an Adjusted Forecast Plan.
+ADJUSTMENT_PROMPT_TEMPLATE = """Analyse the following user request and baseline demand forecasts to produce an Adjusted Forecast Plan or evaluate domain relevance.
+
+## User Request / Query
+{user_query}
 
 ## Baseline Forecasts (Exponential Smoothing, alpha={alpha})
 {baseline_json}
@@ -299,10 +304,11 @@ Return a JSON object with this exact structure:
   "market_insights": [
     "<string: one-sentence insight about overall demand patterns>"
   ],
-  "summary": "<one-paragraph executive summary of the demand outlook>"
+  "summary": "<executive summary of demand outlook if in-domain, OR a polite out-of-scope redirection message if the user query is completely unrelated to Demand Forecasting>"
 }}
 
 Rules:
+- If the query is unrelated to Demand Forecasting, set "adjusted_forecasts" to [] and "market_insights" to [], and provide the polite out-of-scope rejection and redirection in "summary".
 - Only adjust forecasts where you have a clear qualitative reason.
 - If a product is stable, keep adjusted_weekly_forecast == baseline_weekly_forecast and set adjustment_pct to 0.
 - adjustment_pct = ((adjusted - baseline) / baseline) * 100. Positive = upward revision.
@@ -415,7 +421,9 @@ async def demand_forecasting_agent(
             llm_service = LLMService()
 
         try:
+            user_query = state.get("query", "Provide a demand forecast.")
             prompt = ADJUSTMENT_PROMPT_TEMPLATE.format(
+                user_query=user_query,
                 alpha=alpha,
                 baseline_json=json.dumps(baseline_forecasts, indent=2),
                 volatile_json=json.dumps(volatile_products, indent=2) if volatile_products
@@ -454,6 +462,7 @@ async def demand_forecasting_agent(
                 "forecast_period_days": FORECAST_PERIOD_DAYS,
                 "historical_data": baseline_forecasts,
                 "forecast_results": forecast_results,
+                "summary": adjustment_result.get("summary", ""),
                 # Extended metadata
                 "_volatile_products": volatile_products,
                 "_market_insights": adjustment_result.get("market_insights", []),

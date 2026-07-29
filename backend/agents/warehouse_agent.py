@@ -281,11 +281,18 @@ def detect_capacity_bottlenecks(
 #  LLM Integration
 # ═══════════════════════════════════════════════════════════════
 
-SYSTEM_INSTRUCTION = """You are a warehouse operations expert and industrial engineer.
+SYSTEM_INSTRUCTION = """You are a warehouse operations expert and industrial engineer specializing in Warehouse Operations, capacity utilization, bin layout, pick lists, and space allocation.
 Analyse warehouse data and provide actionable optimisation recommendations.
+
+DOMAIN GUARDRAILS:
+Evaluate the user's query. If the query is completely unrelated to your specific domain (Warehouse Operations, capacity utilization, bin layout, pick lists, warehouse space), you MUST NOT process the state data or generate your standard report. Instead, return a polite message stating that this task is outside your scope as the Warehouse Ops Agent in the "summary" field, leave "space_reallocation", "bottleneck_warnings", and "bin_layout_suggestions" empty [], and explicitly suggest which of the other specific agents (Inventory Planning, Demand Forecasting, Route Optimization, Fleet Management, Customer Notification) they should select from the dropdown, or suggest switching to the Multi-Agent Supervisor.
+
 Always respond with valid JSON matching the schema provided."""
 
-OPTIMIZATION_PROMPT_TEMPLATE = """Analyse the following warehouse data and generate an Optimization Plan.
+OPTIMIZATION_PROMPT_TEMPLATE = """Analyse the following user request and warehouse data to generate an Optimization Plan or evaluate domain relevance.
+
+## User Request / Query
+{user_query}
 
 ## Warehouse Capacity Summary
 {capacity_json}
@@ -323,7 +330,7 @@ Return a JSON object with this exact structure:
       "<string: one-sentence suggestion>"
     ]
   }},
-  "summary": "<one-paragraph executive summary>"
+  "summary": "<executive summary of warehouse plan if in-domain, OR a polite out-of-scope redirection message if the user query is completely unrelated to Warehouse Operations>"
 }}
 """
 
@@ -443,7 +450,9 @@ async def warehouse_operations_agent(
 
         try:
             top_bins = all_bin_allocations[:20]  # send top 20 to LLM
+            user_query = state.get("query", "Optimize warehouse operations.")
             prompt = OPTIMIZATION_PROMPT_TEMPLATE.format(
+                user_query=user_query,
                 capacity_json=json.dumps(warehouses_serialised, indent=2),
                 bottleneck_json=json.dumps(bottlenecks, indent=2) if bottlenecks else "None — all warehouses within limits.",
                 threshold=CAPACITY_THRESHOLD_PCT,
@@ -468,12 +477,15 @@ async def warehouse_operations_agent(
             + [w["warning"] for w in opt_plan.get("bottleneck_warnings", [])]
             + [r["action"] for r in opt_plan.get("space_reallocation", [])]
         )
+        if not suggestions and optimization_result.get("summary"):
+            suggestions = [optimization_result.get("summary")]
 
         result: dict[str, Any] = {
             "warehouse": {
                 "utilization_pct": _avg_utilisation(warehouses_serialised),
                 "pending_picks": optimised_picks,
                 "optimization_suggestions": suggestions,
+                "summary": optimization_result.get("summary", ""),
                 # Extended data for downstream agents / UI
                 "_capacity_report": warehouses_serialised,
                 "_bottlenecks": bottlenecks,

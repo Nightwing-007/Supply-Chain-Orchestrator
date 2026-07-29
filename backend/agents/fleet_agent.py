@@ -195,14 +195,17 @@ def flag_maintenance_thresholds(
 # =============================================================
 
 SYSTEM_INSTRUCTION = """You are a Senior Fleet Manager and Logistics Maintenance Specialist.
-Analyse vehicle telemetry, mileage, service history, and fleet utilization.
-Categorise flagged vehicles into precise operational action categories:
-- "Immediate Grounding" (critical safety or major limit exceedance)
-- "Schedule End-of-Week" (nearing limit, non-critical)
-- "Safe for Local Routes Only" (minor anomaly, e.g. low fuel or near local warehouse)
+Analyse vehicle telemetry, mileage, service history, and fleet utilization. Categorise flagged vehicles into operational action categories.
+
+DOMAIN GUARDRAILS:
+Evaluate the user's query. If the query is completely unrelated to your specific domain (Fleet Management, vehicle telemetry, vehicle maintenance, fuel levels, vehicle grounding), you MUST NOT process the state data or generate your standard report. Instead, return a polite message stating that this task is outside your scope as the Fleet Management Agent in the "summary" field, leave "categorized_vehicles" and "recommendations" empty [], and explicitly suggest which of the other specific agents (Inventory Planning, Warehouse Ops, Demand Forecasting, Route Optimization, Customer Notification) they should select from the dropdown, or suggest switching to the Multi-Agent Supervisor.
+
 Always respond with valid JSON matching the exact schema provided."""
 
-FLEET_MAINTENANCE_PROMPT_TEMPLATE = """Analyse the following flagged vehicle telemetry and fleet status to generate a Fleet Maintenance & Reallocation Plan.
+FLEET_MAINTENANCE_PROMPT_TEMPLATE = """Analyse the following user request and vehicle telemetry to generate a Fleet Maintenance & Reallocation Plan or evaluate domain relevance.
+
+## User Request / Query
+{user_query}
 
 ## Overall Fleet Utilization Rate
 {utilization_pct}% of total fleet currently in transit.
@@ -231,11 +234,12 @@ Return a JSON object with this exact structure:
       "<string: actionable fleet management advice>"
     ]
   }},
-  "summary": "<one-paragraph executive summary of the fleet maintenance decision>"
+  "summary": "<executive summary of fleet maintenance decision if in-domain, OR a polite out-of-scope redirection message if the user query is completely unrelated to Fleet Management>"
 }}
 
 Rules:
-- Ground any vehicle with mileage >= 10,000 km AND days >= 90 immediately.
+- If the query is unrelated to Fleet Management, set "categorized_vehicles" and "recommendations" to [], and provide the polite out-of-scope rejection and redirection in "summary".
+- Ground any vehicle with mileage >= 10,000 km AND days >= 90 immediately when in-domain.
 - Vehicles with low fuel (<15%) should be sent for refuelling before deployment.
 - Reallocate loads to available healthy vehicles if a truck is grounded.
 """
@@ -359,7 +363,9 @@ async def fleet_management_agent(
             llm_service = LLMService()
 
         try:
+            user_query = state.get("query", "Assess fleet health and maintenance.")
             prompt = FLEET_MAINTENANCE_PROMPT_TEMPLATE.format(
+                user_query=user_query,
                 utilization_pct=utilization_pct,
                 flagged_json=json.dumps(flagged_vehicles, indent=2) if flagged_vehicles
                     else "None -- all fleet vehicles operate within normal parameters.",
@@ -402,6 +408,7 @@ async def fleet_management_agent(
                 "fuel_level_pct": float(primary.get("fuel_level_pct") or 100.0),
                 "available_vehicles": available_vehicles,
                 "maintenance_alerts": maintenance_alerts,
+                "summary": maintenance_result.get("summary", ""),
                 # Extended metadata
                 "_fleet_utilization_pct": utilization_pct,
                 "_flagged_vehicles": flagged_vehicles,
