@@ -1,9 +1,10 @@
 """
 Supply Chain Orchestrator — Unified LLM Service
 
-Provides an async LLM client with:
-  • Primary:  GitHub Models (gpt-4o-mini via Azure-compatible OpenAI endpoint)
-  • Fallback: Google Gemini (gemini-2.0-flash via google-genai SDK)
+Provides an async LLM client with a 3-tier fallback architecture:
+  • Priority 1 (Primary): Groq API (llama-3.3-70b-versatile via AsyncOpenAI)
+  • Priority 2 (Secondary): GitHub Models (gpt-4o-mini via Azure-compatible OpenAI endpoint)
+  • Priority 3 (Tertiary): Google Gemini (gemini-2.0-flash via google-genai SDK)
 
 All agent code calls `llm_service.generate(...)` — provider selection and
 fallback logic are encapsulated here.
@@ -11,6 +12,7 @@ fallback logic are encapsulated here.
 
 import json
 import logging
+import os
 import time
 from typing import Any, Optional
 
@@ -38,7 +40,7 @@ def _clean_json_string(text: str) -> str:
 
 class LLMService:
     """
-    Async LLM gateway with automatic fallback.
+    Async LLM gateway with automatic 3-tier fallback (Groq -> GitHub -> Gemini).
 
     Usage:
         service = LLMService()
@@ -48,7 +50,20 @@ class LLMService:
     def __init__(self) -> None:
         settings = get_settings()
 
-        # ── Primary: GitHub Models (OpenAI-compatible) ──────
+        # ── Priority 1: Groq API (Primary OpenAI-compatible) ──
+        groq_key = settings.groq_api_key or os.environ.get("GROQ_API_KEY") or ""
+        self._groq_client = None
+        if groq_key:
+            try:
+                self._groq_client = AsyncOpenAI(
+                    api_key=groq_key,
+                    base_url=settings.groq_models_endpoint,
+                )
+            except Exception as exc:
+                logger.warning("Could not initialize Groq client: %s", exc)
+        self._groq_model = settings.groq_model
+
+        # ── Priority 2: GitHub Models (Secondary Fallback) ──
         github_token = settings.github_token or "placeholder_token"
         self._github_client = AsyncOpenAI(
             api_key=github_token,
@@ -56,7 +71,7 @@ class LLMService:
         )
         self._github_model = settings.github_model
 
-        # ── Secondary Fallback: Google Gemini ──────────────────────────
+        # ── Priority 3: Google Gemini (Tertiary Fallback) ──
         self._gemini_client = None
         if settings.google_api_key:
             try:
@@ -79,10 +94,22 @@ class LLMService:
         """
         Generate a structured JSON response from the LLM.
 
-        Tries GitHub Models first; falls back to Gemini on failure.
+        Tries Groq first; falls back to GitHub Models, then Gemini on failure.
         Returns the parsed JSON dict.
         """
-        # Attempt 1 — GitHub Models (Primary)
+        # Attempt 1 — Groq (Primary)
+        if self._groq_client:
+            try:
+                return await self._call_groq(
+                    prompt,
+                    system_instruction=system_instruction,
+                    temperature=temperature,
+                    max_output_tokens=max_output_tokens,
+                )
+            except Exception as exc:
+                logger.warning("Groq primary call failed (%s), falling back to GitHub Models", exc)
+
+        # Attempt 2 — GitHub Models (Secondary Fallback)
         try:
             return await self._call_github(
                 prompt,
@@ -91,9 +118,9 @@ class LLMService:
                 max_output_tokens=max_output_tokens,
             )
         except Exception as exc:
-            logger.warning("GitHub Models primary call failed (%s), falling back to Gemini", exc)
+            logger.warning("GitHub Models secondary call failed (%s), falling back to Gemini", exc)
 
-        # Attempt 2 — Gemini (Secondary Fallback)
+        # Attempt 3 — Gemini (Tertiary Fallback)
         try:
             if not self._gemini_client:
                 raise ValueError("Gemini client is not initialized or API key is missing.")
@@ -105,7 +132,7 @@ class LLMService:
                 max_output_tokens=max_output_tokens,
             )
         except Exception as exc:
-            logger.warning("Gemini secondary fallback failed cleanly: %s", exc)
+            logger.warning("Gemini tertiary fallback failed cleanly: %s", exc)
             raise
 
     async def generate_text(
@@ -118,9 +145,21 @@ class LLMService:
     ) -> str:
         """
         Generate a plain-text response (no JSON parsing).
-        Tries GitHub Models first; falls back to Gemini.
+        Tries Groq first; falls back to GitHub Models, then Gemini.
         """
-        # Attempt 1 — GitHub Models (Primary)
+        # Attempt 1 — Groq (Primary)
+        if self._groq_client:
+            try:
+                return await self._call_groq_text(
+                    prompt,
+                    system_instruction=system_instruction,
+                    temperature=temperature,
+                    max_output_tokens=max_output_tokens,
+                )
+            except Exception as exc:
+                logger.warning("Groq text call failed (%s), falling back to GitHub Models", exc)
+
+        # Attempt 2 — GitHub Models (Secondary Fallback)
         try:
             return await self._call_github_text(
                 prompt,
@@ -131,7 +170,7 @@ class LLMService:
         except Exception as exc:
             logger.warning("GitHub Models text call failed (%s), falling back to Gemini", exc)
 
-        # Attempt 2 — Gemini (Secondary Fallback)
+        # Attempt 3 — Gemini (Tertiary Fallback)
         try:
             if not self._gemini_client:
                 raise ValueError("Gemini client is not initialized or API key is missing.")
@@ -144,6 +183,68 @@ class LLMService:
         except Exception as exc:
             logger.warning("Gemini text fallback failed cleanly: %s", exc)
             raise
+
+    # ── Groq Internals ────────────────────────────────────────
+
+    async def _call_groq(
+        self,
+        prompt: str,
+        *,
+        system_instruction: Optional[str],
+        temperature: float,
+        max_output_tokens: int,
+    ) -> dict[str, Any]:
+        """Call Groq API (OpenAI-compatible) and return parsed JSON."""
+        if not self._groq_client:
+            raise ValueError("Groq client is not initialized.")
+        t0 = time.perf_counter()
+        messages = []
+        if system_instruction:
+            messages.append({"role": "system", "content": system_instruction})
+        messages.append({"role": "user", "content": prompt})
+
+        response = await self._groq_client.chat.completions.create(
+            model=self._groq_model,
+            messages=messages,
+            temperature=temperature,
+            max_tokens=max_output_tokens,
+            response_format={"type": "json_object"},
+        )
+        elapsed = (time.perf_counter() - t0) * 1000
+        logger.info("Groq responded in %.0f ms", elapsed)
+        print("DEBUG: Successfully generated response using Groq")
+
+        raw = response.choices[0].message.content or ""
+        cleaned = _clean_json_string(raw)
+        return json.loads(cleaned)
+
+    async def _call_groq_text(
+        self,
+        prompt: str,
+        *,
+        system_instruction: Optional[str],
+        temperature: float,
+        max_output_tokens: int,
+    ) -> str:
+        """Call Groq API and return raw text."""
+        if not self._groq_client:
+            raise ValueError("Groq client is not initialized.")
+        t0 = time.perf_counter()
+        messages = []
+        if system_instruction:
+            messages.append({"role": "system", "content": system_instruction})
+        messages.append({"role": "user", "content": prompt})
+
+        response = await self._groq_client.chat.completions.create(
+            model=self._groq_model,
+            messages=messages,
+            temperature=temperature,
+            max_tokens=max_output_tokens,
+        )
+        elapsed = (time.perf_counter() - t0) * 1000
+        logger.info("Groq text responded in %.0f ms", elapsed)
+        print("DEBUG: Successfully generated response using Groq")
+        return response.choices[0].message.content or ""
 
     # ── GitHub Models Internals ──────────────────────────────
 
@@ -259,4 +360,5 @@ class LLMService:
         elapsed = (time.perf_counter() - t0) * 1000
         logger.info("Gemini text responded in %.0f ms", elapsed)
         return response.text or ""
+
 

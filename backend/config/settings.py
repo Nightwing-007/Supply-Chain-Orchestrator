@@ -25,6 +25,11 @@ class Settings(BaseSettings):
     google_api_key: str = ""
     gemini_model: str = "gemini-2.0-flash"
 
+    # ── Groq API (Primary LLM) ──────────────────────────────────
+    groq_api_key: str = ""
+    groq_models_endpoint: str = "https://api.groq.com/openai/v1"
+    groq_model: str = "llama-3.3-70b-versatile"
+
     # ── GitHub Models (Azure-compatible) ────────────────────────
     github_token: str = ""
     github_models_endpoint: str = "https://models.inference.ai.azure.com"
