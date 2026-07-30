@@ -5,6 +5,7 @@ import {
   RefreshCw, GitBranch, CheckCircle2, ShieldAlert, Lock, ShoppingBag, LogOut,
   PanelRightClose, PanelRightOpen
 } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import { runWorkflow, runSingleAgent, fetchDashboardData } from "./api";
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, LineChart, Line, Legend } from "recharts";
 import ReactMarkdown from "react-markdown";
@@ -134,63 +135,44 @@ export default function App() {
     await submitQuery(text);
   };
 
+  const kpiCards = [
+    { label: 'Critical Alerts', value: dashboardData?.kpis?.critical_alerts ?? 4, suffix: '', icon: AlertTriangle, iconBg: 'bg-red-500/10 text-red-400 border-red-500/20', glow: 'glow-red', pulse: true },
+    { label: 'Total Items Tracked', value: dashboardData?.kpis?.total_items ?? 10, suffix: 'SKUs', icon: Database, iconBg: 'bg-sky-500/10 text-sky-400 border-sky-500/20', glow: 'glow-cyan', pulse: false },
+    { label: 'Active Shipments', value: dashboardData?.kpis?.active_shipments ?? dashboardData?.shipments?.length ?? 4, suffix: 'EN ROUTE', icon: Package, iconBg: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20', glow: 'glow-emerald', pulse: false },
+    { label: 'Avg Warehouse Fill', value: `${dashboardData?.kpis?.avg_fill_pct ?? 89.0}%`, suffix: '', icon: Activity, iconBg: 'bg-amber-500/10 text-amber-400 border-amber-500/20', glow: 'glow-amber', pulse: false },
+  ];
+
   const renderKPIBar = () => (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
-      {/* 1. Critical Alerts */}
-      <div className="p-6 bg-border-panel/10 border border-border-panel rounded-xl flex items-center justify-between relative overflow-hidden">
-        <div>
-          <span className="text-xs uppercase tracking-widest font-medium text-text-secondary">Critical Alerts</span>
-          <div className="text-3xl font-light tracking-tight mt-1 flex items-center gap-3">
-            {dashboardData?.kpis?.critical_alerts ?? 4}
-            <span className="relative flex h-3 w-3">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
-            </span>
+      {kpiCards.map((kpi, idx) => (
+        <motion.div
+          key={kpi.label}
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: idx * 0.08, ease: 'easeOut' }}
+          whileHover={{ scale: 1.02, transition: { duration: 0.2 } }}
+          className="glass-card p-6 rounded-2xl flex items-center justify-between relative overflow-hidden group cursor-default transform-gpu will-change-transform"
+        >
+          <div>
+            <span className="text-xs uppercase tracking-widest font-medium text-text-secondary">{kpi.label}</span>
+            <div className="text-3xl font-light tracking-tight mt-1 flex items-center gap-3">
+              {kpi.value}
+              {kpi.suffix && <span className="text-xs text-text-secondary font-mono">{kpi.suffix}</span>}
+              {kpi.pulse && (
+                <span className="relative flex h-3 w-3">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                </span>
+              )}
+            </div>
           </div>
-        </div>
-        <div className="p-3 bg-red-500/10 text-red-400 rounded-lg border border-red-500/20">
-          <AlertTriangle size={22} />
-        </div>
-      </div>
-
-      {/* 2. Total Items Tracked */}
-      <div className="p-6 bg-border-panel/10 border border-border-panel rounded-xl flex items-center justify-between">
-        <div>
-          <span className="text-xs uppercase tracking-widest font-medium text-text-secondary">Total Items Tracked</span>
-          <div className="text-3xl font-light tracking-tight mt-1">
-            {dashboardData?.kpis?.total_items ?? 10} <span className="text-xs text-text-secondary font-mono">SKUs</span>
+          <div className={`p-3 rounded-lg border ${kpi.iconBg}`}>
+            <kpi.icon size={22} />
           </div>
-        </div>
-        <div className="p-3 bg-blue-500/10 text-blue-400 rounded-lg border border-blue-500/20">
-          <Database size={22} />
-        </div>
-      </div>
-
-      {/* 3. Active Shipments */}
-      <div className="p-6 bg-border-panel/10 border border-border-panel rounded-xl flex items-center justify-between">
-        <div>
-          <span className="text-xs uppercase tracking-widest font-medium text-text-secondary">Active Shipments</span>
-          <div className="text-3xl font-light tracking-tight mt-1">
-            {dashboardData?.kpis?.active_shipments ?? dashboardData?.shipments?.length ?? 4} <span className="text-xs text-text-secondary font-mono">EN ROUTE</span>
-          </div>
-        </div>
-        <div className="p-3 bg-emerald-500/10 text-emerald-400 rounded-lg border border-emerald-500/20">
-          <Package size={22} />
-        </div>
-      </div>
-
-      {/* 4. Avg Warehouse Fill % */}
-      <div className="p-6 bg-border-panel/10 border border-border-panel rounded-xl flex items-center justify-between">
-        <div>
-          <span className="text-xs uppercase tracking-widest font-medium text-text-secondary">Avg Warehouse Fill</span>
-          <div className="text-3xl font-light tracking-tight mt-1">
-            {dashboardData?.kpis?.avg_fill_pct ?? 89.0}%
-          </div>
-        </div>
-        <div className="p-3 bg-amber-500/10 text-amber-400 rounded-lg border border-amber-500/20">
-          <Activity size={22} />
-        </div>
-      </div>
+          {/* Subtle ambient glow on hover */}
+          <div className={`absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none ${kpi.glow}`} />
+        </motion.div>
+      ))}
     </div>
   );
 
@@ -219,7 +201,7 @@ export default function App() {
         }
 
         return (
-          <div key={idx} className="p-6 border border-border-panel bg-border-panel/10 rounded-xl space-y-4">
+          <motion.div key={idx} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: idx * 0.06, duration: 0.35 }} className="glass-card p-6 rounded-2xl space-y-4 transform-gpu will-change-transform">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
                 <div className="flex items-center gap-3">
@@ -252,7 +234,7 @@ export default function App() {
                 <div className={`h-full transition-all duration-500 ${barColor}`} style={{ width: `${Math.max(fillPercentage, 4)}%` }}></div>
               </div>
             </div>
-          </div>
+          </motion.div>
         );
       })}
     </div>
@@ -281,7 +263,7 @@ export default function App() {
               </div>
               <span className="text-xs font-mono text-text-secondary text-accent-primary">LIVE DB</span>
             </div>
-            <div className="h-[360px] w-full bg-border-panel/10 p-6 rounded-xl border border-border-panel">
+            <div className="h-[360px] w-full glass-card p-6 rounded-2xl">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart 
                   data={dashboardData?.inventory_items || [
@@ -294,18 +276,29 @@ export default function App() {
                   ]} 
                   margin={{ top: 10, right: 20, left: -10, bottom: 5 }}
                 >
-                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
-                  <XAxis dataKey="sku" stroke="var(--color-text-secondary)" fontSize={12} tickLine={false} axisLine={false} />
-                  <YAxis stroke="var(--color-text-secondary)" fontSize={12} tickLine={false} axisLine={false} />
+                  <defs>
+                    <linearGradient id="barGradientStock" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#34d399" stopOpacity={0.95} />
+                      <stop offset="100%" stopColor="#059669" stopOpacity={0.6} />
+                    </linearGradient>
+                    <linearGradient id="barGradientThreshold" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#7c8baa" stopOpacity={0.7} />
+                      <stop offset="100%" stopColor="#3a4a6b" stopOpacity={0.35} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                  <XAxis dataKey="sku" stroke="var(--color-text-secondary)" fontSize={11} tickLine={false} axisLine={false} />
+                  <YAxis stroke="var(--color-text-secondary)" fontSize={11} tickLine={false} axisLine={false} />
                   <Tooltip 
                     contentStyle={{ 
-                      backgroundColor: '#1e293b', 
-                      borderColor: '#334155', 
-                      color: '#fff',
-                      borderRadius: '0.5rem',
-                      boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.5)'
+                      backgroundColor: 'rgba(10, 16, 30, 0.9)', 
+                      borderColor: 'rgba(255,255,255,0.08)', 
+                      color: '#f1f5f9',
+                      borderRadius: '0.75rem',
+                      backdropFilter: 'blur(12px)',
+                      boxShadow: '0 10px 40px rgba(0, 0, 0, 0.5)'
                     }}
-                    itemStyle={{ color: '#fff' }}
+                    itemStyle={{ color: '#f1f5f9' }}
                     formatter={(value, name) => [
                       `${value} units`, 
                       name === 'quantity_on_hand' ? 'Available Stock' : 'Reorder Threshold'
@@ -319,8 +312,8 @@ export default function App() {
                       </span>
                     )}
                   />
-                  <Bar dataKey="quantity_on_hand" name="quantity_on_hand" fill="#10b981" radius={[4, 4, 0, 0]} barSize={20} />
-                  <Bar dataKey="reorder_point" name="reorder_point" fill="#64748b" radius={[4, 4, 0, 0]} barSize={20} />
+                  <Bar dataKey="quantity_on_hand" name="quantity_on_hand" fill="url(#barGradientStock)" radius={[6, 6, 0, 0]} barSize={22} />
+                  <Bar dataKey="reorder_point" name="reorder_point" fill="url(#barGradientThreshold)" radius={[6, 6, 0, 0]} barSize={22} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -331,7 +324,7 @@ export default function App() {
               <h2 className="text-sm font-medium tracking-wide text-text-secondary uppercase">Route Tracking (Load over time)</h2>
               <span className="text-xs font-mono text-text-secondary text-accent-primary">ACTIVE</span>
             </div>
-            <div className="h-[360px] w-full flex flex-col items-center justify-center bg-border-panel/10 p-4 rounded-xl border border-border-panel">
+            <div className="h-[360px] w-full flex flex-col items-center justify-center glass-card p-4 rounded-2xl">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={dashboardData?.flow || []} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                   <defs>
@@ -358,7 +351,7 @@ export default function App() {
               <h2 className="text-sm font-medium tracking-wide text-text-secondary uppercase">Performance</h2>
               <span className="text-xs text-text-secondary">Last 7 Days</span>
             </div>
-            <div className="h-48 w-full bg-border-panel/10 p-4 rounded-xl border border-border-panel">
+            <div className="h-48 w-full glass-card p-4 rounded-2xl">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={dashboardData?.performance || []}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-panel)" vertical={false} />
@@ -377,7 +370,7 @@ export default function App() {
               <h2 className="text-sm font-medium tracking-wide text-text-secondary uppercase">Flow Analysis</h2>
               <button className="text-xs text-text-primary hover:underline uppercase tracking-wider font-medium">Interact</button>
             </div>
-            <div className="h-48 w-full bg-border-panel/10 p-4 rounded-xl border border-border-panel">
+            <div className="h-48 w-full glass-card p-4 rounded-2xl">
                <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={dashboardData?.flow || []}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-panel)" vertical={false} />
@@ -493,7 +486,7 @@ export default function App() {
 
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
           {AGENTS.map((agent) => (
-            <div key={agent.id} className="p-6 border border-border-panel bg-border-panel/10 rounded-xl flex flex-col gap-4 shadow-sm">
+            <motion.div key={agent.id} initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: AGENTS.indexOf(agent) * 0.07, duration: 0.4 }} whileHover={{ scale: 1.01 }} className="glass-card p-6 rounded-2xl flex flex-col gap-4 transform-gpu will-change-transform">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className={`p-2 bg-border-panel/30 rounded-lg ${agent.color}`}>
@@ -517,7 +510,7 @@ export default function App() {
 // Run a workflow via Gemini to populate.`}
                 </pre>
               </div>
-            </div>
+            </motion.div>
           ))}
         </div>
       </>
@@ -555,7 +548,7 @@ export default function App() {
   };
 
   return (
-    <div className="h-screen w-full flex flex-col lg:flex-row bg-bg-base text-text-primary font-sans font-light overflow-hidden relative">
+    <div className="h-screen w-full flex flex-col lg:flex-row bg-bg-base tactical-bg text-text-primary font-sans font-light overflow-hidden relative">
       
       {/* Toast Notifications */}
       <Toaster 
@@ -586,16 +579,15 @@ export default function App() {
       <div className="flex-1 flex flex-col min-w-0 border-r border-border-panel">
         
         {/* Strictly Aligned Header */}
-        <header className="h-20 px-6 lg:px-16 flex items-center justify-between shrink-0 border-b border-border-panel">
-          <div className="flex items-center gap-16">
-            <div className="flex items-center gap-4 cursor-pointer group">
+        <header className="h-20 px-6 lg:px-8 flex items-center justify-between shrink-0 glass-header sticky top-0 z-40 overflow-hidden">
+          <div className="flex items-center gap-6 lg:gap-10 min-w-0">
+            <div className="flex items-center gap-3 shrink-0 cursor-pointer group">
               <div className="w-5 h-5 bg-text-primary flex items-center justify-center group-hover:bg-accent-primary transition-colors rounded-sm">
                 <div className="w-1.5 h-1.5 bg-bg-base"></div>
               </div>
-              <span className="font-medium tracking-tight text-lg">Orchestrator</span>
             </div>
             
-            <nav className="flex items-center overflow-x-auto gap-6 lg:gap-10 text-sm hide-scrollbar">
+            <nav className="flex items-center overflow-x-auto gap-4 lg:gap-8 text-sm hide-scrollbar min-w-0">
               {['Dashboard', 'Shipments', 'Risks', 'Agents', 'Shop Portal'].map((tab) => (
                 <div key={tab} onClick={() => setActiveTab(tab)} className="relative cursor-pointer group h-20 flex items-center shrink-0">
                   <span className={`whitespace-nowrap transition-colors ${activeTab === tab ? 'text-text-primary font-medium' : 'text-text-secondary group-hover:text-text-primary'}`}>
@@ -609,11 +601,11 @@ export default function App() {
             </nav>
           </div>
           
-          <div className="flex items-center gap-4 text-text-secondary shrink-0">
+          <div className="flex items-center gap-2 lg:gap-3 text-text-secondary shrink-0">
             {!isAuthenticated ? (
               <button
                 onClick={() => setIsLoginModalOpen(true)}
-                className="px-3.5 py-1.5 bg-accent-primary/10 text-accent-primary border border-accent-primary/20 rounded-lg text-xs font-medium hover:bg-accent-primary hover:text-bg-base transition-colors cursor-pointer flex items-center gap-1.5 whitespace-nowrap"
+                className="px-3 py-1.5 bg-accent-primary/10 text-accent-primary border border-accent-primary/20 rounded-lg text-xs font-medium hover:bg-accent-primary hover:text-bg-base transition-colors cursor-pointer flex items-center gap-1.5 whitespace-nowrap"
               >
                 <Lock size={13} /> Owner Login
               </button>
@@ -631,7 +623,11 @@ export default function App() {
             {/* Sidebar Collapse Toggle Button */}
             <button
               onClick={() => setIsChatOpen(!isChatOpen)}
-              className="p-1.5 text-text-secondary hover:text-text-primary transition-colors cursor-pointer rounded-lg hover:bg-border-panel/30"
+              className={`p-2 rounded-xl transition-all cursor-pointer flex items-center justify-center border ${
+                isChatOpen
+                  ? "bg-accent-primary/10 text-accent-primary border-accent-primary/20 hover:bg-accent-primary hover:text-bg-base"
+                  : "bg-surface-tint text-text-primary border-border-panel hover:bg-accent-primary/20"
+              }`}
               title={isChatOpen ? "Collapse AI Chat Sidebar" : "Expand AI Chat Sidebar"}
             >
               {isChatOpen ? <PanelRightClose size={18} /> : <PanelRightOpen size={18} />}
@@ -683,7 +679,7 @@ export default function App() {
       </div>
 
       {/* RIGHT COLUMN: CHAT PANEL */}
-      <aside className={`w-full lg:w-[440px] h-[50vh] lg:h-full flex flex-col shrink-0 bg-bg-base border-t lg:border-t-0 lg:border-l border-border-panel shadow-2xl z-10 transition-all duration-300 ${!isChatOpen ? 'hidden lg:hidden' : ''}`}>
+      <aside className={`w-full lg:w-[440px] h-[50vh] lg:h-full flex flex-col shrink-0 glass-sidebar shadow-2xl z-10 transition-all duration-300 ${!isChatOpen ? 'hidden lg:hidden' : ''}`}>
         
         <div className="h-20 px-6 lg:px-8 flex items-center justify-between shrink-0 border-b border-border-panel">
           <span className="text-sm font-medium tracking-tight">CHAT</span>
@@ -721,15 +717,15 @@ export default function App() {
 
         {/* Multi-Agent Supervisor Execution Pipeline */}
         {orchestratorMode === "multi" && (
-          <div className="px-6 lg:px-8 py-3 border-b border-border-panel bg-border-panel/10 shrink-0">
+          <div className="px-6 lg:px-8 py-3 border-b border-subtle surface-tint shrink-0">
             <div className="text-[10px] font-medium uppercase tracking-widest text-text-secondary mb-2 flex items-center justify-between">
               <span>Multi-Agent Routing Pipeline</span>
-              <span className="text-accent-primary font-mono">{isTyping ? "PROCESSING" : "READY"}</span>
+              <span className={`font-mono ${isTyping ? 'text-accent-success animate-pulse' : 'text-accent-primary'}`}>{isTyping ? "PROCESSING" : "READY"}</span>
             </div>
             <div className="flex items-center gap-2 overflow-x-auto py-1 hide-scrollbar">
-              <div className="flex items-center gap-1 px-2.5 py-1 bg-border-panel/40 border border-border-panel rounded-full text-xs font-medium shrink-0">
+              <div className="flex items-center gap-1 px-2.5 py-1 bg-accent-primary/10 border border-accent-primary/20 rounded-full text-xs font-medium shrink-0 glow-cyan">
                 <GitBranch size={12} className="text-accent-primary" />
-                <span>Supervisor</span>
+                <span className="text-accent-primary">Supervisor</span>
               </div>
               <ArrowRight size={12} className="text-text-secondary shrink-0" />
               {AGENTS.map((ag) => {
@@ -737,10 +733,10 @@ export default function App() {
                 return (
                   <div
                     key={ag.id}
-                    className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs transition-colors shrink-0 ${
+                    className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs transition-all duration-300 shrink-0 ${
                       isExecuted
-                        ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-medium"
-                        : "bg-border-panel/20 text-text-secondary border border-border-panel/30"
+                        ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/25 font-medium glow-emerald"
+                        : "surface-tint text-text-secondary border border-subtle"
                     }`}
                   >
                     <ag.icon size={12} />
@@ -749,7 +745,7 @@ export default function App() {
                 );
               })}
               <ArrowRight size={12} className="text-text-secondary shrink-0" />
-              <div className="flex items-center gap-1 px-2.5 py-1 bg-accent-primary/20 text-accent-primary border border-accent-primary/30 rounded-full text-xs font-medium shrink-0">
+              <div className="flex items-center gap-1 px-2.5 py-1 bg-accent-primary/15 text-accent-primary border border-accent-primary/25 rounded-full text-xs font-medium shrink-0 glow-cyan">
                 <CheckCircle2 size={12} />
                 <span>FINISH</span>
               </div>

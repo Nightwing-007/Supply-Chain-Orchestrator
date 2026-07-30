@@ -17,19 +17,19 @@
 }
 
 @layer base {
-  /* Dark Mode Overrides */
+  /* Tactical Dark Mode — Deep Obsidian */
   .dark {
-    --color-bg-base: #0B0F17;
-    --color-bg-panel: #111827;
-    --color-border-panel: #1F2937;
-    --color-text-primary: #F8FAFC;
-    --color-text-secondary: #94A3B8;
-    --color-text-placeholder: #475569;
+    --color-bg-base: #030712;
+    --color-bg-panel: #0a101e;
+    --color-border-panel: #1a2236;
+    --color-text-primary: #f1f5f9;
+    --color-text-secondary: #7c8baa;
+    --color-text-placeholder: #3a4a6b;
     
-    --color-accent-primary: #60A5FA;
-    --color-accent-success: #34D399;
-    --color-accent-warning: #FBBF24;
-    --color-accent-critical: #F87171;
+    --color-accent-primary: #38bdf8;
+    --color-accent-success: #34d399;
+    --color-accent-warning: #fbbf24;
+    --color-accent-critical: #f87171;
   }
 
   * {
@@ -52,4 +52,130 @@
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: var(--color-border-panel); border-radius: 4px; }
   ::-webkit-scrollbar-thumb:hover { background: var(--color-text-secondary); }
+}
+
+/* ─── Glassmorphism Utilities (Light / Dark Aware) ────────── */
+@layer utilities {
+  /* Glass Panel — generic container (No blur for scroll perf) */
+  .glass-panel {
+    background: rgba(255, 255, 255, 0.95);
+    border: 1px solid rgba(0, 0, 0, 0.08);
+  }
+  .dark .glass-panel {
+    background: rgba(10, 16, 30, 0.95);
+    border-color: rgba(255, 255, 255, 0.06);
+  }
+
+  /* Glass Header — sticky navbar */
+  .glass-header {
+    background: rgba(248, 250, 252, 0.75);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  }
+  .dark .glass-header {
+    background: rgba(3, 7, 18, 0.7);
+    border-bottom-color: rgba(255, 255, 255, 0.06);
+  }
+
+  /* Glass Card — elevated panels, charts, KPI cards (No blur for scroll perf) */
+  .glass-card {
+    background: rgba(255, 255, 255, 0.92);
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  }
+  .dark .glass-card {
+    background: rgba(10, 16, 30, 0.92);
+    border-color: rgba(255, 255, 255, 0.07);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  }
+
+  /* Glass Sidebar — chat panel (No blur for zero compositing lag) */
+  .glass-sidebar {
+    background: #F8FAFC;
+    border-left: 1px solid rgba(0, 0, 0, 0.08);
+  }
+  .dark .glass-sidebar {
+    background: #0A101E;
+    border-left-color: rgba(255, 255, 255, 0.06);
+  }
+
+  /* Glass Modal Overlay — for Add/Edit modals */
+  .glass-modal-overlay {
+    background: rgba(0, 0, 0, 0.25);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+  .dark .glass-modal-overlay {
+    background: rgba(0, 0, 0, 0.60);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+  }
+
+  /* Glow utilities — kept for dark mode accents, invisible in light */
+  .glow-emerald {
+    box-shadow: none;
+  }
+  .dark .glow-emerald {
+    box-shadow: 0 0 18px rgba(52, 211, 153, 0.3), 0 0 6px rgba(52, 211, 153, 0.15);
+  }
+
+  .glow-cyan {
+    box-shadow: none;
+  }
+  .dark .glow-cyan {
+    box-shadow: 0 0 18px rgba(56, 189, 248, 0.3), 0 0 6px rgba(56, 189, 248, 0.15);
+  }
+
+  .glow-red {
+    box-shadow: none;
+  }
+  .dark .glow-red {
+    box-shadow: 0 0 18px rgba(248, 113, 113, 0.25), 0 0 6px rgba(248, 113, 113, 0.12);
+  }
+
+  .glow-amber {
+    box-shadow: none;
+  }
+  .dark .glow-amber {
+    box-shadow: 0 0 18px rgba(251, 191, 36, 0.25), 0 0 6px rgba(251, 191, 36, 0.12);
+  }
+
+  /* Tactical background gradient — light/dark aware */
+  .tactical-bg {
+    background: radial-gradient(ellipse 120% 80% at 50% 0%, #f0f4f8 0%, #f8fafc 50%, #eef2f6 100%);
+  }
+  .dark .tactical-bg {
+    background: radial-gradient(ellipse 120% 80% at 50% 0%, #0c1629 0%, #030712 50%, #000000 100%);
+  }
+
+  /* Adaptive surface colors — semantic classes for subtle tints */
+  .surface-tint {
+    background: rgba(0, 0, 0, 0.02);
+  }
+  .dark .surface-tint {
+    background: rgba(255, 255, 255, 0.02);
+  }
+
+  .surface-tint-hover:hover {
+    background: rgba(0, 0, 0, 0.04);
+  }
+  .dark .surface-tint-hover:hover {
+    background: rgba(255, 255, 255, 0.02);
+  }
+
+  .border-subtle {
+    border-color: rgba(0, 0, 0, 0.08);
+  }
+  .dark .border-subtle {
+    border-color: rgba(255, 255, 255, 0.06);
+  }
+
+  .hide-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .hide-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
 }

@@ -3,6 +3,7 @@ import {
   Plus, Edit, Trash2, RefreshCw, Search, Package, AlertTriangle, 
   CheckCircle2, DollarSign, Layers, X, ChevronLeft, ChevronRight 
 } from "lucide-react";
+import { motion } from "framer-motion";
 import { toast } from "react-hot-toast";
 import { fetchProducts, createProduct, updateProduct, deleteProduct } from "../api";
 
@@ -10,8 +11,17 @@ export default function ShopManagement({ onTriggerRestock }) {
   const [products, setProducts] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
+
+  // Debounce search query to prevent unnecessary recalculations on fast typing
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
@@ -135,9 +145,9 @@ export default function ShopManagement({ onTriggerRestock }) {
     setEditingProduct(p);
   };
 
-  // Performance Optimization: Memoized filter calculation
+  // Performance Optimization: Memoized filter calculation using debounced search
   const filteredProducts = useMemo(() => {
-    const q = searchQuery.toLowerCase().trim();
+    const q = debouncedSearchQuery.toLowerCase().trim();
     if (!q) return products;
     return products.filter((p) => {
       const nameMatch = p.name ? p.name.toLowerCase().includes(q) : false;
@@ -145,12 +155,12 @@ export default function ShopManagement({ onTriggerRestock }) {
       const catMatch = p.category ? p.category.toLowerCase().includes(q) : false;
       return nameMatch || skuMatch || catMatch;
     });
-  }, [products, searchQuery]);
+  }, [products, debouncedSearchQuery]);
 
-  // Reset pagination on search query change
+  // Reset pagination on debounced search query change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery]);
+  }, [debouncedSearchQuery]);
 
   const totalPages = Math.max(1, Math.ceil(filteredProducts.length / itemsPerPage));
   const paginatedProducts = useMemo(() => {
@@ -160,7 +170,7 @@ export default function ShopManagement({ onTriggerRestock }) {
 
   return (
     <div className="space-y-8">
-      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border-panel pb-6">
+      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-subtle pb-6">
         <div>
           <h1 className="text-4xl font-light tracking-tight mb-1">Shop Inventory Management</h1>
           <p className="text-text-secondary text-sm">Direct owner control portal for live product catalog, CRUD operations, and stock adjustments.</p>
@@ -193,7 +203,7 @@ export default function ShopManagement({ onTriggerRestock }) {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search by SKU, Product Name, or Category..."
-            className="w-full bg-border-panel/10 border border-border-panel rounded-xl pl-10 pr-4 py-2.5 text-sm text-text-primary placeholder:text-text-placeholder focus:outline-none focus:border-accent-primary transition-colors"
+            className="w-full bg-bg-panel/50 border border-border-panel rounded-xl pl-10 pr-4 py-2.5 text-sm text-text-primary placeholder:text-text-placeholder focus:outline-none focus:border-accent-primary transition-colors"
           />
         </div>
         <div className="text-xs font-mono text-text-secondary">
@@ -206,27 +216,30 @@ export default function ShopManagement({ onTriggerRestock }) {
         <div className="text-text-secondary text-sm py-12 text-center">Loading product catalog...</div>
       ) : (
         <div className="space-y-4">
-          <div className="bg-border-panel/10 border border-border-panel rounded-2xl overflow-hidden shadow-xl">
+          <div className="glass-card rounded-2xl overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm border-collapse">
                 <thead>
-                  <tr className="border-b border-border-panel bg-border-panel/20 text-xs font-medium text-text-secondary uppercase tracking-wider">
-                    <th className="py-4 px-6">SKU</th>
-                    <th className="py-4 px-6">Product Details</th>
-                    <th className="py-4 px-6">Unit Price</th>
-                    <th className="py-4 px-6">Stock Level</th>
+                  <tr className="border-b border-subtle surface-tint text-xs font-medium text-text-secondary uppercase tracking-wider">
+                  <th className="py-4 px-6">SKU</th>
+                  <th className="py-4 px-6">Product Details</th>
+                  <th className="py-4 px-6">Unit Price</th>
+                  <th className="py-4 px-6">Stock Level</th>
                     <th className="py-4 px-6">Reorder Threshold</th>
                     <th className="py-4 px-6">Health Status</th>
                     <th className="py-4 px-6 text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-border-panel/50">
-                  {paginatedProducts.map((p) => {
-                    const isLow = p.quantity_on_hand <= p.reorder_point;
-                    const isCritical = p.quantity_on_hand === 0;
+                <tbody className="divide-y divide-border-panel">
+                {paginatedProducts.map((p, rowIdx) => {
+                  const isLow = p.quantity_on_hand <= p.reorder_point;
+                  const isCritical = p.quantity_on_hand === 0;
 
-                    return (
-                      <tr key={p.id} className="hover:bg-border-panel/10 transition-colors">
+                  return (
+                    <tr
+                      key={p.id}
+                      className="surface-tint-hover transition-colors"
+                    >
                         <td className="py-4 px-6 font-mono text-xs text-accent-primary font-medium">{p.sku}</td>
                         <td className="py-4 px-6">
                           <div className="font-medium text-text-primary">{p.name}</div>
@@ -321,9 +334,9 @@ export default function ShopManagement({ onTriggerRestock }) {
 
       {/* Add Product Modal */}
       {isAddModalOpen && (
-        <div className="fixed inset-0 bg-bg-base/80 backdrop-blur-md flex items-center justify-center p-4 z-50">
-          <div className="w-full max-w-lg bg-bg-panel border border-border-panel rounded-2xl shadow-2xl overflow-hidden p-6 space-y-6">
-            <div className="flex items-center justify-between border-b border-border-panel pb-4">
+        <div className="fixed inset-0 glass-modal-overlay flex items-center justify-center p-4 z-50">
+          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.25 }} className="w-full max-w-lg glass-card rounded-2xl shadow-2xl overflow-hidden p-6 space-y-6 transform-gpu will-change-transform">
+            <div className="flex items-center justify-between border-b border-subtle pb-4">
               <h3 className="text-xl font-light text-text-primary">Add New Product to Catalog</h3>
               <button onClick={() => setIsAddModalOpen(false)} className="text-text-secondary hover:text-text-primary cursor-pointer">
                 <X size={20} />
@@ -419,15 +432,15 @@ export default function ShopManagement({ onTriggerRestock }) {
                 </button>
               </div>
             </form>
-          </div>
+          </motion.div>
         </div>
       )}
 
       {/* Edit Product Modal */}
       {editingProduct && (
-        <div className="fixed inset-0 bg-bg-base/80 backdrop-blur-md flex items-center justify-center p-4 z-50">
-          <div className="w-full max-w-lg bg-bg-panel border border-border-panel rounded-2xl shadow-2xl overflow-hidden p-6 space-y-6">
-            <div className="flex items-center justify-between border-b border-border-panel pb-4">
+        <div className="fixed inset-0 glass-modal-overlay flex items-center justify-center p-4 z-50">
+          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.25 }} className="w-full max-w-lg glass-card rounded-2xl shadow-2xl overflow-hidden p-6 space-y-6 transform-gpu will-change-transform">
+            <div className="flex items-center justify-between border-b border-subtle pb-4">
               <div>
                 <h3 className="text-xl font-light text-text-primary">Edit Product Details</h3>
                 <p className="text-xs text-text-secondary font-mono">SKU: {editForm.sku}</p>
@@ -513,7 +526,7 @@ export default function ShopManagement({ onTriggerRestock }) {
                 </button>
               </div>
             </form>
-          </div>
+          </motion.div>
         </div>
       )}
     </div>
