@@ -5,7 +5,7 @@ import {
   RefreshCw, GitBranch, CheckCircle2, ShieldAlert
 } from "lucide-react";
 import { runWorkflow, runSingleAgent, fetchDashboardData } from "./api";
-import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, LineChart, Line } from "recharts";
+import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, LineChart, Line, Legend } from "recharts";
 import ReactMarkdown from "react-markdown";
 
 const AGENTS = [
@@ -262,6 +262,60 @@ export default function App() {
         <div className="text-text-secondary text-sm">Loading real-time data from database...</div>
       ) : (
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-x-16 gap-y-16">
+          {/* Inventory Stock vs. Reorder Threshold Comparison Chart */}
+          <section className="xl:col-span-2">
+            <div className="flex items-end justify-between mb-4 border-b border-border-panel pb-3">
+              <div>
+                <h2 className="text-sm font-medium tracking-wide text-text-secondary uppercase">Inventory Stock vs. Reorder Threshold</h2>
+                <p className="text-xs text-text-secondary mt-0.5">Real-time comparison of available stock against safety thresholds across SKUs</p>
+              </div>
+              <span className="text-xs font-mono text-text-secondary text-accent-primary">LIVE DB</span>
+            </div>
+            <div className="h-[360px] w-full bg-border-panel/10 p-6 rounded-xl border border-border-panel">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart 
+                  data={dashboardData?.inventory_items || [
+                    { sku: 'SKU-ELEC-001', quantity_on_hand: 5, reorder_point: 100 },
+                    { sku: 'SKU-ELEC-002', quantity_on_hand: 2, reorder_point: 50 },
+                    { sku: 'SKU-HOME-001', quantity_on_hand: 0, reorder_point: 30 },
+                    { sku: 'SKU-HOME-002', quantity_on_hand: 3, reorder_point: 40 },
+                    { sku: 'SKU-ELEC-003', quantity_on_hand: 220, reorder_point: 25 },
+                    { sku: 'SKU-GROC-001', quantity_on_hand: 1200, reorder_point: 100 },
+                  ]} 
+                  margin={{ top: 10, right: 20, left: -10, bottom: 5 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
+                  <XAxis dataKey="sku" stroke="var(--color-text-secondary)" fontSize={12} tickLine={false} axisLine={false} />
+                  <YAxis stroke="var(--color-text-secondary)" fontSize={12} tickLine={false} axisLine={false} />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: '#1e293b', 
+                      borderColor: '#334155', 
+                      color: '#fff',
+                      borderRadius: '0.5rem',
+                      boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.5)'
+                    }}
+                    itemStyle={{ color: '#fff' }}
+                    formatter={(value, name) => [
+                      `${value} units`, 
+                      name === 'quantity_on_hand' ? 'Available Stock' : 'Reorder Threshold'
+                    ]}
+                  />
+                  <Legend 
+                    wrapperStyle={{ paddingTop: '10px' }}
+                    formatter={(value) => (
+                      <span className="text-xs font-medium text-text-secondary">
+                        {value === 'quantity_on_hand' ? 'Available Stock' : 'Reorder Threshold'}
+                      </span>
+                    )}
+                  />
+                  <Bar dataKey="quantity_on_hand" name="quantity_on_hand" fill="#10b981" radius={[4, 4, 0, 0]} barSize={20} />
+                  <Bar dataKey="reorder_point" name="reorder_point" fill="#64748b" radius={[4, 4, 0, 0]} barSize={20} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </section>
+
           <section className="xl:col-span-2">
             <div className="flex items-end justify-between mb-4 border-b border-border-panel pb-3">
               <h2 className="text-sm font-medium tracking-wide text-text-secondary uppercase">Route Tracking (Load over time)</h2>
