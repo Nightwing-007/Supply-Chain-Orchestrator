@@ -12,6 +12,7 @@ Provides:
 """
 
 import asyncio
+import json
 import logging
 import sys
 import time
@@ -675,7 +676,7 @@ async def create_sale(req: SaleCreateRequest):
                     if not p:
                         raise HTTPException(status_code=404, detail=f"Product with ID {item.product_id} not found")
 
-                    stock = await conn.fetchval("SELECT quantity_on_hand FROM inventory WHERE product_id = $1", item.product_id) or 0
+                    stock = await conn.fetchval("SELECT COALESCE(SUM(quantity_on_hand), 0) FROM inventory WHERE product_id = $1", item.product_id) or 0
                     if stock < item.quantity:
                         raise HTTPException(
                             status_code=status.HTTP_400_BAD_REQUEST,
@@ -697,7 +698,7 @@ async def create_sale(req: SaleCreateRequest):
 
                 order_id = await conn.fetchval("""
                     INSERT INTO orders (order_number, customer_name, customer_email, customer_phone, delivery_address, delivery_city, status, total_amount)
-                    VALUES ($1, $2, $3, $4, $5, $6, 'confirmed'::sco.order_status, $7)
+                    VALUES ($1, $2, $3, $4, $5, $6, 'confirmed'::order_status, $7)
                     RETURNING id
                 """, order_number, req.customer_name, req.customer_email, req.customer_phone, req.delivery_address, req.delivery_city, total_amount)
 
@@ -707,12 +708,21 @@ async def create_sale(req: SaleCreateRequest):
                         VALUES ($1, $2, $3, $4)
                     """, order_id, detail["product_id"], detail["quantity"], detail["unit_price"])
 
-                    await conn.execute("""
-                        UPDATE inventory
-                        SET quantity_on_hand = GREATEST(0, quantity_on_hand - $1),
-                            updated_at = NOW()
-                        WHERE product_id = $2
-                    """, detail["quantity"], detail["product_id"])
+                    # Target specific warehouse inventory record with highest stock
+                    wh_inv_id = await conn.fetchval("""
+                        SELECT id FROM inventory
+                        WHERE product_id = $1
+                        ORDER BY quantity_on_hand DESC, warehouse_id ASC
+                        LIMIT 1
+                    """, detail["product_id"])
+
+                    if wh_inv_id:
+                        await conn.execute("""
+                            UPDATE inventory
+                            SET quantity_on_hand = GREATEST(0, quantity_on_hand - $1),
+                                updated_at = NOW()
+                            WHERE id = $2
+                        """, detail["quantity"], wh_inv_id)
 
                 return {
                     "status": "success",
