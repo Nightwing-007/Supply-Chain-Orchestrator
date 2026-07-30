@@ -147,10 +147,11 @@ During hackathon development on a host machine with **16 GB of System RAM and an
 - PostgreSQL, FastAPI, Streamlit, and Python runtimes consume another ~4–6 GB RAM.
 - Operating system overhead leaves less than 3 GB RAM, causing Windows to swap memory to disk (thrashing), resulting in high latency, connection timeouts, and Out-Of-Memory (OOM) crashes.
 
-### 3.3 Cloud-Only LLM Inference
-To ensure zero hardware throttling, all LLM reasoning is offloaded to high-throughput cloud APIs:
-- **Primary LLM:** Google Gemini 2.5 Flash via `google-genai` SDK (~300ms latency, high rate limit).
-- **Fallback LLM:** GPT-4o-mini via GitHub Models endpoint (`https://models.inference.ai.azure.com`).
+### 3.3 Cloud-Only 3-Tier LLM Architecture
+To ensure zero hardware throttling, maximum speed, and resilience against rate limits, all LLM reasoning is offloaded to high-throughput cloud APIs via a 3-tier fallback architecture:
+- **Primary LLM (Priority 1):** Groq API (`llama-3.3-70b-versatile` via `AsyncOpenAI` client) for ultra-fast, high-throughput inference with generous rate limits.
+- **Secondary Fallback LLM (Priority 2):** GitHub Models (`gpt-4o-mini` via Azure-compatible OpenAI endpoint).
+- **Tertiary Fallback LLM (Priority 3):** Google Gemini (`gemini-2.0-flash` via `google-genai` SDK).
 
 ---
 
@@ -394,7 +395,7 @@ pytest tests/ -v
 ## 7. Hackathon Demo & Interview Talking Points
 
 ### 7.1 60-Second Elevator Pitch for Judges
-> *"Supply Chain Orchestrator is a smart multi-agent logistics platform built with LangGraph, PostgreSQL, FastAPI, and Google Gemini. Traditional supply chains suffer because inventory, warehouse, fleet, and route planning operate in data silos. We built 6 specialized single AI agents that combine hard mathematical algorithms—like Cycle Sort for minimal-move bin allocations and Haversine Nearest Neighbor TSP for route dispatch—with Gemini 2.5 Flash for qualitative reasoning. On Single Agent Mode, each agent works as a standalone micro-service. On Multi Agent Mode, our LangGraph Supervisor routes complex multi-domain queries iteratively across a shared state graph. Judges can see the live JSON memory update in real-time on our Streamlit dashboard."*
+> *"Supply Chain Orchestrator is a smart multi-agent logistics platform built with LangGraph, PostgreSQL, FastAPI, React 19, and a high-speed 3-tier LLM fallback architecture (Groq API, GitHub Models, Google Gemini). Traditional supply chains suffer because inventory, warehouse, fleet, and route planning operate in data silos. We built 6 specialized single AI agents that combine hard mathematical algorithms—like Cycle Sort for minimal-move bin allocations and Haversine Nearest Neighbor TSP for route dispatch—with Groq API (llama-3.3-70b-versatile) for ultra-fast qualitative reasoning. On Single Agent Mode, each agent works as a standalone micro-service. On Multi Agent Mode, our LangGraph Supervisor routes complex multi-domain queries iteratively across a shared state graph. Judges can see the live telemetry update in real-time on our React 19 dashboard."*
 
 ---
 
@@ -407,7 +408,7 @@ pytest tests/ -v
 **Answer:** In physical warehouse operations, updating a bin assignment requires physically moving inventory or writing a record update to a database tracking forklift movements. QuickSort performs $O(N \log N)$ writes. Cycle Sort is theoretically optimal in terms of memory writes, guaranteeing at most $O(N)$ writes ($\le N - 1$), minimizing physical warehouse reorganization costs.
 
 #### Q3: How do you handle LLM API rate limits or network outages in production?
-**Answer:** Every agent in our architecture implements a **deterministic fallback pattern**. If the LLM API call times out or fails, the agent falls back to pure algorithmic output (e.g. pure Nearest Neighbor sequence for routes, or strict threshold grounding for fleet). The system gracefully degrades without breaking the graph execution.
+**Answer:** Every agent in our architecture relies on a **3-tier fallback gateway** (`Groq API Primary ──► GitHub Models Secondary ──► Google Gemini Tertiary`). If Groq hits rate limits or experiences network failures, the service seamlessly shifts execution to GitHub Models, then Google Gemini. If all LLMs fail, the agents fall back to pure deterministic algorithms (e.g. pure Nearest Neighbor sequence for routes, or strict threshold grounding for fleet). The system gracefully degrades without breaking graph execution.
 
 #### Q4: How do you prevent infinite loops in your multi-agent supervisor graph?
 **Answer:** The supervisor node tracks execution history in `GlobalLogisticsState.agent_responses`. Before routing to a target agent, the supervisor checks if that agent has already executed in the current session. If a duplicate invocation is detected, the supervisor overrides the target to `"FINISH"`, guaranteeing loop termination.

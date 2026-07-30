@@ -81,12 +81,17 @@ Edit `.env` and configure your credentials:
 # Note: If your password contains special characters like '@', URL-encode them (e.g. '@' becomes '%40')
 DATABASE_URL=postgresql://postgres:your_password@localhost:5432/supply_chain
 
-# ── Primary LLM: GitHub Models (OpenAI-compatible) ──────────
+# ── Primary LLM: Groq API (OpenAI-compatible) ───────────────
+GROQ_API_KEY=your_actual_groq_api_key
+GROQ_MODELS_ENDPOINT=https://api.groq.com/openai/v1
+GROQ_MODEL=llama-3.3-70b-versatile
+
+# ── Secondary Fallback LLM: GitHub Models ───────────────────
 GITHUB_TOKEN=your_actual_github_token
 GITHUB_MODELS_ENDPOINT=https://models.inference.ai.azure.com
 GITHUB_MODEL=gpt-4o-mini
 
-# ── Secondary Fallback LLM: Google Gemini ───────────────────
+# ── Tertiary Fallback LLM: Google Gemini ────────────────────
 GOOGLE_API_KEY=your_actual_google_gemini_api_key
 GEMINI_MODEL=gemini-2.0-flash
 
@@ -208,8 +213,9 @@ pytest tests/test_notification_agent.py -v
 # 2. Test LangGraph Supervisor Orchestrator
 pytest tests/test_supervisor.py -v
 
-# 3. Test FastAPI REST API
+# 3. Test FastAPI REST API & LLM Service
 pytest tests/test_main.py -v
+pytest tests/test_llm_service.py -v
 ```
 
 ---
