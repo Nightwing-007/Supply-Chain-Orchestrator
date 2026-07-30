@@ -547,6 +547,35 @@ async def update_product(item_id: int, req: ProductUpdateRequest):
         )
 
 
+@app.delete("/api/products/{item_id}", tags=["Product Management"])
+async def delete_product(item_id: int):
+    """Delete a product and its associated inventory records from PostgreSQL."""
+    try:
+        pool = await get_pool()
+        async with pool.acquire() as conn:
+            async with conn.transaction():
+                # Check product exists
+                p_exists = await conn.fetchval("SELECT id FROM products WHERE id = $1", item_id)
+                if not p_exists:
+                    raise HTTPException(status_code=404, detail=f"Product with ID {item_id} not found")
+
+                # Delete inventory dependent records first
+                await conn.execute("DELETE FROM inventory WHERE product_id = $1", item_id)
+
+                # Delete product
+                await conn.execute("DELETE FROM products WHERE id = $1", item_id)
+
+                return {"status": "success", "message": f"Product {item_id} deleted successfully", "id": item_id}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("Error deleting product %d: %s", item_id, exc)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error deleting product: {str(exc)}",
+        )
+
+
 # ── CLI Mode ─────────────────────────────────────────────────
 
 async def cli_mode():

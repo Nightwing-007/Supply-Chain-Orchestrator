@@ -10,7 +10,7 @@ Covers:
   6. POST /api/agent/{invalid_name} returns 404 Not Found.
 """
 
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from httpx import ASGITransport, AsyncClient
@@ -198,4 +198,34 @@ async def test_login_invalid_credentials():
         assert response.status_code == 401
         data = response.json()
         assert "detail" in data
+
+
+# =============================================================
+#  Test 5: Product Deletion & Products API
+# =============================================================
+
+@pytest.mark.asyncio
+@patch("main.get_pool")
+async def test_delete_product_not_found(mock_get_pool):
+    """DELETE /api/products/99999 returns 404 Not Found."""
+    mock_trans = MagicMock()
+    mock_trans.__aenter__ = AsyncMock(return_value=None)
+    mock_trans.__aexit__ = AsyncMock(return_value=None)
+
+    mock_conn = AsyncMock()
+    mock_conn.fetchval.return_value = None  # Product does not exist
+    mock_conn.transaction = MagicMock(return_value=mock_trans)
+
+    mock_acq = MagicMock()
+    mock_acq.__aenter__ = AsyncMock(return_value=mock_conn)
+    mock_acq.__aexit__ = AsyncMock(return_value=None)
+
+    mock_pool = MagicMock()
+    mock_pool.acquire = MagicMock(return_value=mock_acq)
+    mock_get_pool.return_value = mock_pool
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        response = await client.delete("/api/products/999999")
+        assert response.status_code == 404
+        assert "not found" in response.json()["detail"].lower()
 

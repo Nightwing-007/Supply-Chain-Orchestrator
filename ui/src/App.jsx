@@ -2,11 +2,13 @@ import { useState, useEffect, useRef } from "react";
 import { 
   Search, Moon, Sun, ArrowRight, MessageSquare, Send, AlertTriangle, 
   Package, Activity, Cpu, Database, Network, Server, User,
-  RefreshCw, GitBranch, CheckCircle2, ShieldAlert, Lock, ShoppingBag, LogOut
+  RefreshCw, GitBranch, CheckCircle2, ShieldAlert, Lock, ShoppingBag, LogOut,
+  PanelRightClose, PanelRightOpen
 } from "lucide-react";
 import { runWorkflow, runSingleAgent, fetchDashboardData } from "./api";
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, LineChart, Line, Legend } from "recharts";
 import ReactMarkdown from "react-markdown";
+import { Toaster, toast } from "react-hot-toast";
 import Login from "./components/Login";
 import ShopManagement from "./components/ShopManagement";
 
@@ -35,7 +37,8 @@ export default function App() {
   const [isLoadingDashboard, setIsLoadingDashboard] = useState(true);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
 
-  // Authentication State
+  // Sidebar Toggle & Auth State
+  const [isChatOpen, setIsChatOpen] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
 
@@ -71,6 +74,7 @@ export default function App() {
 
   const submitQuery = async (queryText) => {
     if (!queryText.trim()) return;
+    if (!isChatOpen) setIsChatOpen(true);
     setMessages(prev => [...prev, { role: 'user', content: queryText }]);
     setIsTyping(true);
     if (window.innerWidth < 1024) {
@@ -553,6 +557,20 @@ export default function App() {
   return (
     <div className="h-screen w-full flex flex-col lg:flex-row bg-bg-base text-text-primary font-sans font-light overflow-hidden relative">
       
+      {/* Toast Notifications */}
+      <Toaster 
+        position="top-right" 
+        toastOptions={{ 
+          style: { 
+            background: '#1e293b', 
+            color: '#fff', 
+            border: '1px solid #334155',
+            borderRadius: '0.75rem',
+            fontSize: '0.875rem'
+          } 
+        }} 
+      />
+
       {/* Login Modal */}
       {isLoginModalOpen && (
         <Login
@@ -577,10 +595,10 @@ export default function App() {
               <span className="font-medium tracking-tight text-lg">Orchestrator</span>
             </div>
             
-            <nav className="flex overflow-x-auto gap-6 lg:gap-10 text-sm hide-scrollbar">
+            <nav className="flex items-center overflow-x-auto gap-6 lg:gap-10 text-sm hide-scrollbar">
               {['Dashboard', 'Shipments', 'Risks', 'Agents', 'Shop Portal'].map((tab) => (
-                <div key={tab} onClick={() => setActiveTab(tab)} className="relative cursor-pointer group h-20 flex items-center">
-                  <span className={`transition-colors ${activeTab === tab ? 'text-text-primary font-medium' : 'text-text-secondary group-hover:text-text-primary'}`}>
+                <div key={tab} onClick={() => setActiveTab(tab)} className="relative cursor-pointer group h-20 flex items-center shrink-0">
+                  <span className={`whitespace-nowrap transition-colors ${activeTab === tab ? 'text-text-primary font-medium' : 'text-text-secondary group-hover:text-text-primary'}`}>
                     {tab}
                   </span>
                   {activeTab === tab && (
@@ -591,25 +609,35 @@ export default function App() {
             </nav>
           </div>
           
-          <div className="flex items-center gap-6 text-text-secondary">
+          <div className="flex items-center gap-4 text-text-secondary shrink-0">
             {!isAuthenticated ? (
               <button
                 onClick={() => setIsLoginModalOpen(true)}
-                className="px-3.5 py-1.5 bg-accent-primary/10 text-accent-primary border border-accent-primary/20 rounded-lg text-xs font-medium hover:bg-accent-primary hover:text-bg-base transition-colors cursor-pointer flex items-center gap-1.5"
+                className="px-3.5 py-1.5 bg-accent-primary/10 text-accent-primary border border-accent-primary/20 rounded-lg text-xs font-medium hover:bg-accent-primary hover:text-bg-base transition-colors cursor-pointer flex items-center gap-1.5 whitespace-nowrap"
               >
                 <Lock size={13} /> Owner Login
               </button>
             ) : (
-              <div className="flex items-center gap-2 px-3 py-1 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-full text-xs font-medium">
+              <div className="flex items-center gap-2 px-3 py-1 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-full text-xs font-medium whitespace-nowrap">
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
                 <span>Owner: admin</span>
               </div>
             )}
 
-            <button onClick={() => setIsDark(!isDark)} className="hover:text-text-primary transition-colors cursor-pointer">
+            <button onClick={() => setIsDark(!isDark)} className="hover:text-text-primary transition-colors cursor-pointer p-1.5 hover:bg-border-panel/30 rounded-lg" title="Toggle Theme">
               {isDark ? <Sun size={16} /> : <Moon size={16} />}
             </button>
-            <div className="relative ml-2">
+
+            {/* Sidebar Collapse Toggle Button */}
+            <button
+              onClick={() => setIsChatOpen(!isChatOpen)}
+              className="p-1.5 text-text-secondary hover:text-text-primary transition-colors cursor-pointer rounded-lg hover:bg-border-panel/30"
+              title={isChatOpen ? "Collapse AI Chat Sidebar" : "Expand AI Chat Sidebar"}
+            >
+              {isChatOpen ? <PanelRightClose size={18} /> : <PanelRightOpen size={18} />}
+            </button>
+
+            <div className="relative ml-1">
               <div 
                 onClick={() => setIsProfileOpen(!isProfileOpen)}
                 className="w-8 h-8 bg-border-panel flex items-center justify-center cursor-pointer hover:opacity-80 transition-opacity rounded-full overflow-hidden"
@@ -655,7 +683,7 @@ export default function App() {
       </div>
 
       {/* RIGHT COLUMN: CHAT PANEL */}
-      <aside className="w-full lg:w-[440px] h-[50vh] lg:h-full flex flex-col shrink-0 bg-bg-base border-t lg:border-t-0 lg:border-l border-border-panel shadow-2xl z-10">
+      <aside className={`w-full lg:w-[440px] h-[50vh] lg:h-full flex flex-col shrink-0 bg-bg-base border-t lg:border-t-0 lg:border-l border-border-panel shadow-2xl z-10 transition-all duration-300 ${!isChatOpen ? 'hidden lg:hidden' : ''}`}>
         
         <div className="h-20 px-6 lg:px-8 flex items-center justify-between shrink-0 border-b border-border-panel">
           <span className="text-sm font-medium tracking-tight">CHAT</span>

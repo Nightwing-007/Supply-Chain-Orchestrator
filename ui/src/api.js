@@ -56,3 +56,9 @@ export async function updateProduct(itemId, productData) {
   const { data } = await API.put(`/api/products/${itemId}`, productData);
   return data;
 }
+
+/** DELETE /api/products/{id} — Delete a product */
+export async function deleteProduct(itemId) {
+  const { data } = await API.delete(`/api/products/${itemId}`);
+  return data;
+}

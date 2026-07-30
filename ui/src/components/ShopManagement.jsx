@@ -1,6 +1,10 @@
-import { useState, useEffect } from "react";
-import { Plus, Edit, RefreshCw, Search, Package, AlertTriangle, CheckCircle2, DollarSign, Layers, X } from "lucide-react";
-import { fetchProducts, createProduct, updateProduct } from "../api";
+import { useState, useEffect, useMemo } from "react";
+import { 
+  Plus, Edit, Trash2, RefreshCw, Search, Package, AlertTriangle, 
+  CheckCircle2, DollarSign, Layers, X, ChevronLeft, ChevronRight 
+} from "lucide-react";
+import { toast } from "react-hot-toast";
+import { fetchProducts, createProduct, updateProduct, deleteProduct } from "../api";
 
 export default function ShopManagement({ onTriggerRestock }) {
   const [products, setProducts] = useState([]);
@@ -8,6 +12,10 @@ export default function ShopManagement({ onTriggerRestock }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
+
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
   // New Product Form State
   const [newProduct, setNewProduct] = useState({
@@ -40,6 +48,7 @@ export default function ShopManagement({ onTriggerRestock }) {
       setProducts(data);
     } catch (err) {
       console.error("Failed to load products", err);
+      toast.error("Failed to load products from database.");
     } finally {
       setIsLoading(false);
     }
@@ -65,9 +74,12 @@ export default function ShopManagement({ onTriggerRestock }) {
         quantity_on_hand: 50,
         reorder_point: 20,
       });
+      toast.success(`Product "${newProduct.name}" created successfully!`);
       await loadProducts();
     } catch (err) {
-      setFormError(err.response?.data?.detail || "Failed to create product");
+      const msg = err.response?.data?.detail || "Failed to create product";
+      setFormError(msg);
+      toast.error(msg);
     } finally {
       setIsSubmitting(false);
     }
@@ -87,11 +99,26 @@ export default function ShopManagement({ onTriggerRestock }) {
         reorder_point: editForm.reorder_point,
       });
       setEditingProduct(null);
+      toast.success(`Product updated successfully!`);
       await loadProducts();
     } catch (err) {
-      setFormError(err.response?.data?.detail || "Failed to update product");
+      const msg = err.response?.data?.detail || "Failed to update product";
+      setFormError(msg);
+      toast.error(msg);
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleDeleteProduct = async (p) => {
+    if (window.confirm(`Are you sure you want to remove "${p.name}" (${p.sku}) from the catalog?`)) {
+      try {
+        await deleteProduct(p.id);
+        toast.success(`Product "${p.name}" removed successfully!`);
+        await loadProducts();
+      } catch (err) {
+        toast.error(err.response?.data?.detail || "Failed to delete product");
+      }
     }
   };
 
@@ -108,21 +135,35 @@ export default function ShopManagement({ onTriggerRestock }) {
     setEditingProduct(p);
   };
 
-  const filteredProducts = products.filter((p) => {
+  // Performance Optimization: Memoized filter calculation
+  const filteredProducts = useMemo(() => {
     const q = searchQuery.toLowerCase().trim();
-    if (!q) return true;
-    const nameMatch = p.name ? p.name.toLowerCase().includes(q) : false;
-    const skuMatch = p.sku ? p.sku.toLowerCase().includes(q) : false;
-    const catMatch = p.category ? p.category.toLowerCase().includes(q) : false;
-    return nameMatch || skuMatch || catMatch;
-  });
+    if (!q) return products;
+    return products.filter((p) => {
+      const nameMatch = p.name ? p.name.toLowerCase().includes(q) : false;
+      const skuMatch = p.sku ? p.sku.toLowerCase().includes(q) : false;
+      const catMatch = p.category ? p.category.toLowerCase().includes(q) : false;
+      return nameMatch || skuMatch || catMatch;
+    });
+  }, [products, searchQuery]);
+
+  // Reset pagination on search query change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredProducts.length / itemsPerPage));
+  const paginatedProducts = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage;
+    return filteredProducts.slice(start, start + itemsPerPage);
+  }, [filteredProducts, currentPage, itemsPerPage]);
 
   return (
     <div className="space-y-8">
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border-panel pb-6">
         <div>
           <h1 className="text-4xl font-light tracking-tight mb-1">Shop Inventory Management</h1>
-          <p className="text-text-secondary text-sm">Direct owner control portal for live product catalog and stock adjustments.</p>
+          <p className="text-text-secondary text-sm">Direct owner control portal for live product catalog, CRUD operations, and stock adjustments.</p>
         </div>
 
         <div className="flex items-center gap-3">
@@ -164,81 +205,116 @@ export default function ShopManagement({ onTriggerRestock }) {
       {isLoading ? (
         <div className="text-text-secondary text-sm py-12 text-center">Loading product catalog...</div>
       ) : (
-        <div className="bg-border-panel/10 border border-border-panel rounded-2xl overflow-hidden shadow-xl">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm border-collapse">
-              <thead>
-                <tr className="border-b border-border-panel bg-border-panel/20 text-xs font-medium text-text-secondary uppercase tracking-wider">
-                  <th className="py-4 px-6">SKU</th>
-                  <th className="py-4 px-6">Product Details</th>
-                  <th className="py-4 px-6">Unit Price</th>
-                  <th className="py-4 px-6">Stock Level</th>
-                  <th className="py-4 px-6">Reorder Threshold</th>
-                  <th className="py-4 px-6">Health Status</th>
-                  <th className="py-4 px-6 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border-panel/50">
-                {filteredProducts.map((p) => {
-                  const isLow = p.quantity_on_hand <= p.reorder_point;
-                  const isCritical = p.quantity_on_hand === 0;
+        <div className="space-y-4">
+          <div className="bg-border-panel/10 border border-border-panel rounded-2xl overflow-hidden shadow-xl">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm border-collapse">
+                <thead>
+                  <tr className="border-b border-border-panel bg-border-panel/20 text-xs font-medium text-text-secondary uppercase tracking-wider">
+                    <th className="py-4 px-6">SKU</th>
+                    <th className="py-4 px-6">Product Details</th>
+                    <th className="py-4 px-6">Unit Price</th>
+                    <th className="py-4 px-6">Stock Level</th>
+                    <th className="py-4 px-6">Reorder Threshold</th>
+                    <th className="py-4 px-6">Health Status</th>
+                    <th className="py-4 px-6 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border-panel/50">
+                  {paginatedProducts.map((p) => {
+                    const isLow = p.quantity_on_hand <= p.reorder_point;
+                    const isCritical = p.quantity_on_hand === 0;
 
-                  return (
-                    <tr key={p.id} className="hover:bg-border-panel/10 transition-colors">
-                      <td className="py-4 px-6 font-mono text-xs text-accent-primary font-medium">{p.sku}</td>
-                      <td className="py-4 px-6">
-                        <div className="font-medium text-text-primary">{p.name}</div>
-                        <div className="text-xs text-text-secondary">{p.category || 'General'}</div>
-                      </td>
-                      <td className="py-4 px-6 font-mono text-text-primary">${Number(p.unit_price || 0).toFixed(2)}</td>
-                      <td className="py-4 px-6 font-mono font-medium">{p.quantity_on_hand} units</td>
-                      <td className="py-4 px-6 font-mono text-text-secondary">{p.reorder_point} units</td>
-                      <td className="py-4 px-6">
-                        {isCritical ? (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-red-500/10 text-red-400 border border-red-500/20">
-                            <AlertTriangle size={12} /> Out of Stock
-                          </span>
-                        ) : isLow ? (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                            <AlertTriangle size={12} /> Low Stock
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                            <CheckCircle2 size={12} /> Healthy
-                          </span>
-                        )}
-                      </td>
-                      <td className="py-4 px-6 text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <button
-                            onClick={() => openEditModal(p)}
-                            className="p-1.5 bg-border-panel/30 text-text-secondary hover:text-text-primary rounded-lg transition-colors cursor-pointer"
-                            title="Edit Product"
-                          >
-                            <Edit size={15} />
-                          </button>
-                          {isLow && onTriggerRestock && (
-                            <button
-                              onClick={() => onTriggerRestock(p)}
-                              className="px-2.5 py-1 bg-accent-primary/20 text-accent-primary border border-accent-primary/30 rounded-lg text-xs font-medium hover:bg-accent-primary hover:text-bg-base transition-colors cursor-pointer flex items-center gap-1"
-                            >
-                              <RefreshCw size={12} /> Restock
-                            </button>
+                    return (
+                      <tr key={p.id} className="hover:bg-border-panel/10 transition-colors">
+                        <td className="py-4 px-6 font-mono text-xs text-accent-primary font-medium">{p.sku}</td>
+                        <td className="py-4 px-6">
+                          <div className="font-medium text-text-primary">{p.name}</div>
+                          <div className="text-xs text-text-secondary">{p.category || 'General'}</div>
+                        </td>
+                        <td className="py-4 px-6 font-mono text-text-primary">${Number(p.unit_price || 0).toFixed(2)}</td>
+                        <td className="py-4 px-6 font-mono font-medium">{p.quantity_on_hand} units</td>
+                        <td className="py-4 px-6 font-mono text-text-secondary">{p.reorder_point} units</td>
+                        <td className="py-4 px-6">
+                          {isCritical ? (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-red-500/10 text-red-400 border border-red-500/20">
+                              <AlertTriangle size={12} /> Out of Stock
+                            </span>
+                          ) : isLow ? (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                              <AlertTriangle size={12} /> Low Stock
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                              <CheckCircle2 size={12} /> Healthy
+                            </span>
                           )}
-                        </div>
+                        </td>
+                        <td className="py-4 px-6 text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              onClick={() => openEditModal(p)}
+                              className="p-1.5 bg-border-panel/30 text-text-secondary hover:text-text-primary rounded-lg transition-colors cursor-pointer"
+                              title="Edit Product"
+                            >
+                              <Edit size={15} />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteProduct(p)}
+                              className="p-1.5 bg-red-500/10 text-red-400 hover:bg-red-500/20 hover:text-red-300 rounded-lg transition-colors cursor-pointer border border-red-500/20"
+                              title="Delete Product"
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                            {isLow && onTriggerRestock && (
+                              <button
+                                onClick={() => onTriggerRestock(p)}
+                                className="px-2.5 py-1 bg-accent-primary/20 text-accent-primary border border-accent-primary/30 rounded-lg text-xs font-medium hover:bg-accent-primary hover:text-bg-base transition-colors cursor-pointer flex items-center gap-1"
+                              >
+                                <RefreshCw size={12} /> Restock
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {filteredProducts.length === 0 && (
+                    <tr>
+                      <td colSpan={7} className="py-8 text-center text-text-secondary text-sm">
+                        No products match your search query "{searchQuery}".
                       </td>
                     </tr>
-                  );
-                })}
-                {filteredProducts.length === 0 && (
-                  <tr>
-                    <td colSpan={7} className="py-8 text-center text-text-secondary text-sm">
-                      No products match your search query "{searchQuery}".
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Client-Side Pagination Controls */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-2 px-2">
+            <div className="text-xs text-text-secondary">
+              Showing <span className="font-medium text-text-primary">{filteredProducts.length > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0}</span> to <span className="font-medium text-text-primary">{Math.min(currentPage * itemsPerPage, filteredProducts.length)}</span> of <span className="font-medium text-text-primary">{filteredProducts.length}</span> products
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                className="p-2 bg-border-panel/20 text-text-secondary hover:text-text-primary border border-border-panel rounded-xl disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer flex items-center gap-1 text-xs"
+              >
+                <ChevronLeft size={14} /> Previous
+              </button>
+              <span className="px-3 py-1 text-xs font-mono text-text-secondary bg-border-panel/20 rounded-xl border border-border-panel">
+                Page <strong className="text-text-primary">{currentPage}</strong> of {totalPages}
+              </span>
+              <button
+                disabled={currentPage >= totalPages}
+                onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                className="p-2 bg-border-panel/20 text-text-secondary hover:text-text-primary border border-border-panel rounded-xl disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer flex items-center gap-1 text-xs"
+              >
+                Next <ChevronRight size={14} />
+              </button>
+            </div>
           </div>
         </div>
       )}

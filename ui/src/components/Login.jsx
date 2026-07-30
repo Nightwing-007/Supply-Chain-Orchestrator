@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Lock, User, ShieldCheck, AlertCircle } from "lucide-react";
+import { toast } from "react-hot-toast";
 import { loginUser } from "../api";
 
 export default function Login({ onLoginSuccess, onCancel }) {
@@ -16,12 +17,16 @@ export default function Login({ onLoginSuccess, onCancel }) {
     try {
       const res = await loginUser(username, password);
       if (res && res.status === "success") {
+        toast.success("Authenticated as Shop Owner!");
         onLoginSuccess(res);
       } else {
         setError("Invalid username or password");
+        toast.error("Invalid username or password");
       }
     } catch (err) {
-      setError(err.response?.data?.detail || "Authentication failed. Check credentials.");
+      const msg = err.response?.data?.detail || "Authentication failed. Check credentials.";
+      setError(msg);
+      toast.error(msg);
     } finally {
       setIsSubmitting(false);
     }
