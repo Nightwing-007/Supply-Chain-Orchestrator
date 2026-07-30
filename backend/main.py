@@ -151,6 +151,20 @@ class ProductUpdateRequest(BaseModel):
     reorder_qty: Optional[int] = None
 
 
+class SaleItemSchema(BaseModel):
+    product_id: int
+    quantity: int = Field(gt=0, default=1)
+
+
+class SaleCreateRequest(BaseModel):
+    customer_name: str
+    customer_email: Optional[str] = "customer@example.com"
+    customer_phone: Optional[str] = None
+    delivery_address: Optional[str] = "Main Street Hub"
+    delivery_city: Optional[str] = "Mumbai"
+    items: list[SaleItemSchema]
+
+
 # ── FastAPI Lifespan Manager ─────────────────────────────────
 
 @asynccontextmanager
@@ -573,6 +587,148 @@ async def delete_product(item_id: int):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error deleting product: {str(exc)}",
+        )
+
+
+@app.get("/api/sales", tags=["Sales History"])
+async def get_sales_history():
+    """Retrieve shop sales history including orders, order items, customer details, and summary metrics."""
+    try:
+        pool = await get_pool()
+        async with pool.acquire() as conn:
+            orders = await conn.fetch("""
+                SELECT 
+                    o.id,
+                    o.order_number,
+                    o.customer_name,
+                    o.customer_email,
+                    o.customer_phone,
+                    o.delivery_address,
+                    o.delivery_city,
+                    o.status,
+                    o.priority,
+                    o.total_amount,
+                    o.placed_at,
+                    o.created_at,
+                    COALESCE(
+                        json_agg(
+                            json_build_object(
+                                'product_id', oi.product_id,
+                                'product_name', p.name,
+                                'product_sku', p.sku,
+                                'quantity', oi.quantity,
+                                'unit_price', oi.unit_price
+                            )
+                        ) FILTER (WHERE oi.product_id IS NOT NULL), '[]'::json
+                    ) as items
+                FROM orders o
+                LEFT JOIN order_items oi ON o.id = oi.order_id
+                LEFT JOIN products p ON oi.product_id = p.id
+                GROUP BY o.id
+                ORDER BY o.created_at DESC
+            """)
+
+            order_list = []
+            for o in orders:
+                d = dict(o)
+                if isinstance(d.get("items"), str):
+                    try:
+                        d["items"] = json.loads(d["items"])
+                    except Exception:
+                        d["items"] = []
+                order_list.append(d)
+
+            total_orders = len(order_list)
+            total_revenue = sum(float(o["total_amount"] or 0) for o in order_list)
+            delivered_orders = sum(1 for o in order_list if o["status"] == "delivered")
+            avg_order_value = total_revenue / total_orders if total_orders > 0 else 0.0
+
+            return {
+                "summary": {
+                    "total_orders": total_orders,
+                    "total_revenue": round(total_revenue, 2),
+                    "delivered_orders": delivered_orders,
+                    "avg_order_value": round(avg_order_value, 2),
+                },
+                "orders": order_list,
+            }
+    except Exception as exc:
+        logger.exception("Error fetching sales history: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Database error fetching sales history: {str(exc)}",
+        )
+
+
+@app.post("/api/sales", tags=["Sales History"], status_code=status.HTTP_201_CREATED)
+async def create_sale(req: SaleCreateRequest):
+    """Process a new sale, deduct sold product quantities from inventory, and insert order into PostgreSQL."""
+    try:
+        pool = await get_pool()
+        async with pool.acquire() as conn:
+            async with conn.transaction():
+                total_amount = 0.0
+                item_details = []
+
+                for item in req.items:
+                    p = await conn.fetchrow("SELECT id, sku, name, unit_price FROM products WHERE id = $1", item.product_id)
+                    if not p:
+                        raise HTTPException(status_code=404, detail=f"Product with ID {item.product_id} not found")
+
+                    stock = await conn.fetchval("SELECT quantity_on_hand FROM inventory WHERE product_id = $1", item.product_id) or 0
+                    if stock < item.quantity:
+                        raise HTTPException(
+                            status_code=status.HTTP_400_BAD_REQUEST,
+                            detail=f"Insufficient stock for '{p['name']}'. Available: {stock}, Requested: {item.quantity}",
+                        )
+
+                    unit_price = float(p["unit_price"] or 0)
+                    total_amount += unit_price * item.quantity
+                    item_details.append({
+                        "product_id": p["id"],
+                        "sku": p["sku"],
+                        "name": p["name"],
+                        "quantity": item.quantity,
+                        "unit_price": unit_price
+                    })
+
+                order_count = await conn.fetchval("SELECT COUNT(*) FROM orders") + 1
+                order_number = f"ORD-2026-{order_count:05d}"
+
+                order_id = await conn.fetchval("""
+                    INSERT INTO orders (order_number, customer_name, customer_email, customer_phone, delivery_address, delivery_city, status, total_amount)
+                    VALUES ($1, $2, $3, $4, $5, $6, 'confirmed'::sco.order_status, $7)
+                    RETURNING id
+                """, order_number, req.customer_name, req.customer_email, req.customer_phone, req.delivery_address, req.delivery_city, total_amount)
+
+                for detail in item_details:
+                    await conn.execute("""
+                        INSERT INTO order_items (order_id, product_id, quantity, unit_price)
+                        VALUES ($1, $2, $3, $4)
+                    """, order_id, detail["product_id"], detail["quantity"], detail["unit_price"])
+
+                    await conn.execute("""
+                        UPDATE inventory
+                        SET quantity_on_hand = GREATEST(0, quantity_on_hand - $1),
+                            updated_at = NOW()
+                        WHERE product_id = $2
+                    """, detail["quantity"], detail["product_id"])
+
+                return {
+                    "status": "success",
+                    "order_id": order_id,
+                    "order_number": order_number,
+                    "total_amount": round(total_amount, 2),
+                    "items_sold": len(item_details),
+                    "message": f"Sale completed! Order #{order_number} created and inventory updated."
+                }
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("Error processing sale transaction: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error processing sale transaction: {str(exc)}",
         )
 
 

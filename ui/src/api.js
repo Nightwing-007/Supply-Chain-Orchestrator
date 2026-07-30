@@ -62,3 +62,17 @@ export async function deleteProduct(itemId) {
   const { data } = await API.delete(`/api/products/${itemId}`);
   return data;
 }
+
+/** GET /api/sales — Fetch shop sales history and revenue KPIs */
+export async function fetchSalesHistory() {
+  const { data } = await API.get("/api/sales");
+  return data;
+}
+
+/** POST /api/sales — Record a new customer sale and deduct inventory stock */
+export async function createSaleTransaction(saleData) {
+  const { data } = await API.post("/api/sales", saleData);
+  return data;
+}
+
+
