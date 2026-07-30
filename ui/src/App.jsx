@@ -396,12 +396,12 @@ export default function App() {
             >
               Single Agent
             </button>
-            {/* <button 
+            <button 
               onClick={() => setOrchestratorMode('multi')}
               className={`text-xs px-2 py-1 rounded transition-colors ${orchestratorMode === 'multi' ? 'bg-bg-panel shadow-sm text-text-primary font-medium' : 'text-text-secondary hover:text-text-primary'}`}
             >
-              Multi Agent
-            </button> */}
+              Multi-Agent Supervisor
+            </button>
           </div>
         </div>
 
