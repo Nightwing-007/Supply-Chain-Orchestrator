@@ -124,6 +124,33 @@ class WorkflowResponse(BaseModel):
     execution_time_ms: float = Field(..., description="Total execution duration in milliseconds")
 
 
+class LoginRequest(BaseModel):
+    """Payload for shop owner login."""
+    username: str
+    password: str
+
+
+class ProductCreateRequest(BaseModel):
+    """Payload for creating a new product."""
+    sku: str
+    name: str
+    category: Optional[str] = "General"
+    unit_price: Optional[float] = 0.0
+    quantity_on_hand: int = 0
+    reorder_point: int = 10
+    reorder_qty: int = 50
+
+
+class ProductUpdateRequest(BaseModel):
+    """Payload for updating product details or stock counts."""
+    name: Optional[str] = None
+    category: Optional[str] = None
+    unit_price: Optional[float] = None
+    quantity_on_hand: Optional[int] = None
+    reorder_point: Optional[int] = None
+    reorder_qty: Optional[int] = None
+
+
 # ── FastAPI Lifespan Manager ─────────────────────────────────
 
 @asynccontextmanager
@@ -371,6 +398,152 @@ async def execute_single_agent(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Single Agent '{canonical_key}' execution error: {str(exc)}",
+        )
+
+
+# ── Shop Owner Authentication & Product Management ─────────
+
+@app.post("/api/login", tags=["Authentication"])
+async def login(req: LoginRequest):
+    """Authenticate shop owner with default credentials (admin / password123)."""
+    if req.username == "admin" and req.password == "password123":
+        return {
+            "status": "success",
+            "token": "token_admin_session_99",
+            "username": "admin",
+            "message": "Authentication successful",
+        }
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Invalid username or password",
+    )
+
+
+@app.get("/api/products", tags=["Product Management"])
+async def get_products():
+    """Retrieve all products along with their current inventory levels."""
+    try:
+        pool = await get_pool()
+        async with pool.acquire() as conn:
+            records = await conn.fetch("""
+                SELECT 
+                    p.id,
+                    p.sku,
+                    p.name,
+                    p.category,
+                    p.unit_price,
+                    COALESCE(i.quantity_on_hand, 0) as quantity_on_hand,
+                    COALESCE(i.reorder_point, 10) as reorder_point,
+                    COALESCE(i.reorder_qty, 50) as reorder_qty,
+                    w.code as warehouse_code
+                FROM products p
+                LEFT JOIN inventory i ON i.product_id = p.id
+                LEFT JOIN warehouses w ON i.warehouse_id = w.id
+                ORDER BY p.id ASC
+            """)
+            return [dict(r) for r in records]
+    except Exception as exc:
+        logger.exception("Error fetching products: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Database error fetching products: {str(exc)}",
+        )
+
+
+@app.post("/api/products", tags=["Product Management"], status_code=status.HTTP_201_CREATED)
+async def create_product(req: ProductCreateRequest):
+    """Add a new product to the catalog and initialize its inventory row."""
+    try:
+        pool = await get_pool()
+        async with pool.acquire() as conn:
+            async with conn.transaction():
+                # 1. Insert product
+                p_row = await conn.fetchrow("""
+                    INSERT INTO products (sku, name, category, unit_price)
+                    VALUES ($1, $2, $3, $4)
+                    RETURNING id, sku, name, category, unit_price
+                """, req.sku, req.name, req.category, req.unit_price)
+
+                product_id = p_row["id"]
+
+                # 2. Get default warehouse
+                wh_id = await conn.fetchval("SELECT id FROM warehouses ORDER BY id ASC LIMIT 1") or 1
+
+                # 3. Insert inventory record
+                await conn.execute("""
+                    INSERT INTO inventory (warehouse_id, product_id, quantity_on_hand, reorder_point, reorder_qty)
+                    VALUES ($1, $2, $3, $4, $5)
+                    ON CONFLICT (warehouse_id, product_id)
+                    DO UPDATE SET quantity_on_hand = EXCLUDED.quantity_on_hand, reorder_point = EXCLUDED.reorder_point
+                """, wh_id, product_id, req.quantity_on_hand, req.reorder_point, req.reorder_qty)
+
+                res = dict(p_row)
+                res["quantity_on_hand"] = req.quantity_on_hand
+                res["reorder_point"] = req.reorder_point
+                res["reorder_qty"] = req.reorder_qty
+                return res
+    except Exception as exc:
+        logger.exception("Error creating product: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error creating product: {str(exc)}",
+        )
+
+
+@app.put("/api/products/{item_id}", tags=["Product Management"])
+async def update_product(item_id: int, req: ProductUpdateRequest):
+    """Update existing product details and/or inventory stock counts."""
+    try:
+        pool = await get_pool()
+        async with pool.acquire() as conn:
+            async with conn.transaction():
+                # Check product exists
+                p_exists = await conn.fetchval("SELECT id FROM products WHERE id = $1", item_id)
+                if not p_exists:
+                    raise HTTPException(status_code=404, detail=f"Product with ID {item_id} not found")
+
+                if req.name is not None or req.category is not None or req.unit_price is not None:
+                    await conn.execute("""
+                        UPDATE products
+                        SET name = COALESCE($1, name),
+                            category = COALESCE($2, category),
+                            unit_price = COALESCE($3, unit_price),
+                            updated_at = NOW()
+                        WHERE id = $4
+                    """, req.name, req.category, req.unit_price, item_id)
+
+                if req.quantity_on_hand is not None or req.reorder_point is not None or req.reorder_qty is not None:
+                    await conn.execute("""
+                        UPDATE inventory
+                        SET quantity_on_hand = COALESCE($1, quantity_on_hand),
+                            reorder_point = COALESCE($2, reorder_point),
+                            reorder_qty = COALESCE($3, reorder_qty),
+                            updated_at = NOW()
+                        WHERE product_id = $4
+                    """, req.quantity_on_hand, req.reorder_point, req.reorder_qty, item_id)
+
+                updated_row = await conn.fetchrow("""
+                    SELECT 
+                        p.id,
+                        p.sku,
+                        p.name,
+                        p.category,
+                        p.unit_price,
+                        COALESCE(i.quantity_on_hand, 0) as quantity_on_hand,
+                        COALESCE(i.reorder_point, 10) as reorder_point,
+                        COALESCE(i.reorder_qty, 50) as reorder_qty
+                    FROM products p
+                    LEFT JOIN inventory i ON i.product_id = p.id
+                    WHERE p.id = $1
+                """, item_id)
+                return dict(updated_row)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("Error updating product %d: %s", item_id, exc)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error updating product: {str(exc)}",
         )
 
 

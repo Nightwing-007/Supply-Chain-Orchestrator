@@ -2,11 +2,13 @@ import { useState, useEffect, useRef } from "react";
 import { 
   Search, Moon, Sun, ArrowRight, MessageSquare, Send, AlertTriangle, 
   Package, Activity, Cpu, Database, Network, Server, User,
-  RefreshCw, GitBranch, CheckCircle2, ShieldAlert
+  RefreshCw, GitBranch, CheckCircle2, ShieldAlert, Lock, ShoppingBag, LogOut
 } from "lucide-react";
 import { runWorkflow, runSingleAgent, fetchDashboardData } from "./api";
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, LineChart, Line, Legend } from "recharts";
 import ReactMarkdown from "react-markdown";
+import Login from "./components/Login";
+import ShopManagement from "./components/ShopManagement";
 
 const AGENTS = [
   { id: 'inventory', name: 'Inventory Planning', icon: Database, color: 'text-accent-primary' },
@@ -32,6 +34,10 @@ export default function App() {
   const [dashboardData, setDashboardData] = useState(null);
   const [isLoadingDashboard, setIsLoadingDashboard] = useState(true);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+
+  // Authentication State
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
 
   const chatEndRef = useRef(null);
 
@@ -514,9 +520,50 @@ export default function App() {
     );
   };
 
+  const renderShopPortal = () => {
+    if (!isAuthenticated) {
+      return (
+        <div className="flex flex-col items-center justify-center py-20 space-y-6 text-center">
+          <div className="p-4 bg-accent-primary/10 text-accent-primary rounded-2xl border border-accent-primary/20">
+            <Lock size={40} />
+          </div>
+          <div className="space-y-2 max-w-md">
+            <h2 className="text-2xl font-light text-text-primary">Shop Owner Authentication Required</h2>
+            <p className="text-sm text-text-secondary">You must be logged in as an authorized Shop Owner to manage product catalogs and stock levels.</p>
+          </div>
+          <button
+            onClick={() => setIsLoginModalOpen(true)}
+            className="px-6 py-3 bg-accent-primary text-bg-base font-medium rounded-xl text-sm hover:opacity-90 transition-opacity cursor-pointer shadow-lg"
+          >
+            Owner Login (admin / password123)
+          </button>
+        </div>
+      );
+    }
+
+    return (
+      <ShopManagement
+        onTriggerRestock={(product) => {
+          submitQuery(`Check inventory stock and generate restock order plan for SKU ${product.sku} (${product.name})`);
+        }}
+      />
+    );
+  };
+
   return (
-    <div className="h-screen w-full flex flex-col lg:flex-row bg-bg-base text-text-primary font-sans font-light overflow-hidden">
+    <div className="h-screen w-full flex flex-col lg:flex-row bg-bg-base text-text-primary font-sans font-light overflow-hidden relative">
       
+      {/* Login Modal */}
+      {isLoginModalOpen && (
+        <Login
+          onLoginSuccess={() => {
+            setIsAuthenticated(true);
+            setIsLoginModalOpen(false);
+          }}
+          onCancel={() => setIsLoginModalOpen(false)}
+        />
+      )}
+
       {/* LEFT COLUMN: MAIN STAGE */}
       <div className="flex-1 flex flex-col min-w-0 border-r border-border-panel">
         
@@ -531,7 +578,7 @@ export default function App() {
             </div>
             
             <nav className="flex overflow-x-auto gap-6 lg:gap-10 text-sm hide-scrollbar">
-              {['Dashboard', 'Shipments', 'Risks', 'Agents'].map((tab) => (
+              {['Dashboard', 'Shipments', 'Risks', 'Agents', 'Shop Portal'].map((tab) => (
                 <div key={tab} onClick={() => setActiveTab(tab)} className="relative cursor-pointer group h-20 flex items-center">
                   <span className={`transition-colors ${activeTab === tab ? 'text-text-primary font-medium' : 'text-text-secondary group-hover:text-text-primary'}`}>
                     {tab}
@@ -544,7 +591,20 @@ export default function App() {
             </nav>
           </div>
           
-          <div className="flex items-center gap-8 text-text-secondary">
+          <div className="flex items-center gap-6 text-text-secondary">
+            {!isAuthenticated ? (
+              <button
+                onClick={() => setIsLoginModalOpen(true)}
+                className="px-3.5 py-1.5 bg-accent-primary/10 text-accent-primary border border-accent-primary/20 rounded-lg text-xs font-medium hover:bg-accent-primary hover:text-bg-base transition-colors cursor-pointer flex items-center gap-1.5"
+              >
+                <Lock size={13} /> Owner Login
+              </button>
+            ) : (
+              <div className="flex items-center gap-2 px-3 py-1 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-full text-xs font-medium">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                <span>Owner: admin</span>
+              </div>
+            )}
 
             <button onClick={() => setIsDark(!isDark)} className="hover:text-text-primary transition-colors cursor-pointer">
               {isDark ? <Sun size={16} /> : <Moon size={16} />}
@@ -560,13 +620,24 @@ export default function App() {
               {isProfileOpen && (
                 <div className="absolute right-0 mt-3 w-48 bg-bg-panel border border-border-panel rounded-xl shadow-2xl py-2 z-50">
                   <div className="px-4 py-2 border-b border-border-panel mb-1">
-                    <p className="text-sm font-medium">Logistics Admin</p>
-                    <p className="text-xs text-text-secondary truncate">admin@orchestrator.local</p>
+                    <p className="text-sm font-medium">{isAuthenticated ? 'Shop Owner (admin)' : 'Logistics Admin'}</p>
+                    <p className="text-xs text-text-secondary truncate">{isAuthenticated ? 'admin@shop.local' : 'admin@orchestrator.local'}</p>
                   </div>
-                  <button onClick={() => { alert('Profile Settings feature coming soon!'); setIsProfileOpen(false); }} className="w-full text-left px-4 py-2 text-sm hover:bg-border-panel/30 transition-colors">Profile Settings</button>
-                  <button onClick={() => { alert('API Keys feature coming soon!'); setIsProfileOpen(false); }} className="w-full text-left px-4 py-2 text-sm hover:bg-border-panel/30 transition-colors">API Keys</button>
-                  <div className="border-t border-border-panel my-1"></div>
-                  <button onClick={() => { alert('User authentication not yet implemented.'); setIsProfileOpen(false); }} className="w-full text-left px-4 py-2 text-sm text-accent-critical hover:bg-accent-critical/10 transition-colors">Log Out</button>
+                  {isAuthenticated ? (
+                    <button 
+                      onClick={() => { setIsAuthenticated(false); setIsProfileOpen(false); }} 
+                      className="w-full text-left px-4 py-2 text-sm text-accent-critical hover:bg-accent-critical/10 transition-colors flex items-center gap-2"
+                    >
+                      <LogOut size={14} /> Log Out
+                    </button>
+                  ) : (
+                    <button 
+                      onClick={() => { setIsLoginModalOpen(true); setIsProfileOpen(false); }} 
+                      className="w-full text-left px-4 py-2 text-sm text-accent-primary hover:bg-accent-primary/10 transition-colors flex items-center gap-2"
+                    >
+                      <Lock size={14} /> Owner Login
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -579,6 +650,7 @@ export default function App() {
           {activeTab === "Shipments" && renderShipments()}
           {activeTab === "Risks" && renderRisks()}
           {activeTab === "Agents" && renderAgents()}
+          {activeTab === "Shop Portal" && renderShopPortal()}
         </main>
       </div>
 

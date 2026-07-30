@@ -170,3 +170,32 @@ async def test_single_agent_post_not_found():
         response = await client.post("/api/agent/unknown_agent", json=payload)
         assert response.status_code == 404
         assert "not found" in response.json()["detail"].lower()
+
+
+# =============================================================
+#  Test 4: Shop Owner Login & Auth Endpoint
+# =============================================================
+
+@pytest.mark.asyncio
+async def test_login_success():
+    """POST /api/login with admin/password123 returns 200 OK and auth token."""
+    payload = {"username": "admin", "password": "password123"}
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        response = await client.post("/api/login", json=payload)
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "success"
+        assert "token" in data
+        assert data["username"] == "admin"
+
+
+@pytest.mark.asyncio
+async def test_login_invalid_credentials():
+    """POST /api/login with wrong password returns 401 Unauthorized."""
+    payload = {"username": "admin", "password": "wrongpassword"}
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        response = await client.post("/api/login", json=payload)
+        assert response.status_code == 401
+        data = response.json()
+        assert "detail" in data
+
