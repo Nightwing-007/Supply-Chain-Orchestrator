@@ -43,7 +43,7 @@ CREATE TYPE route_status AS ENUM (
 
 CREATE TYPE shipment_status AS ENUM (
     'created', 'picked_up', 'in_transit', 'out_for_delivery',
-    'delivered', 'failed_attempt', 'returned'
+    'delivered', 'failed_attempt', 'returned', 'delayed', 'preparing'
 );
 
 CREATE TYPE agent_name AS ENUM (
@@ -262,6 +262,7 @@ CREATE TABLE shipments (
     route_id        BIGINT          REFERENCES routes(id),
     vehicle_id      BIGINT          REFERENCES vehicles(id),
     status          shipment_status NOT NULL DEFAULT 'created',
+    origin          VARCHAR(100)    DEFAULT 'Mumbai',
     weight_kg       NUMERIC(10, 2)  DEFAULT 0,
     volume_m3       NUMERIC(10, 4)  DEFAULT 0,
     picked_up_at    TIMESTAMPTZ,

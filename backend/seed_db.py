@@ -21,11 +21,15 @@ async def seed():
         # Now connect to supply_chain and run schema + seed
         conn = await asyncpg.connect(url)
         
-        with open("db/schema.sql", "r", encoding="utf-8") as f:
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        schema_path = os.path.join(script_dir, "db", "schema.sql")
+        seed_path = os.path.join(script_dir, "db", "seed.sql")
+
+        with open(schema_path, "r", encoding="utf-8") as f:
             await conn.execute(f.read())
         print("Schema applied successfully.")
         
-        with open("db/seed.sql", "r", encoding="utf-8") as f:
+        with open(seed_path, "r", encoding="utf-8") as f:
             await conn.execute(f.read())
         print("Seed data inserted successfully.")
         

@@ -142,3 +142,21 @@ INSERT INTO notifications (id, order_id, channel, recipient, subject, body, stat
     (3, 5, 'email', 'ananya@example.com', 'Weather Alert: Potential Route Delay', 'Heavy monsoon downpour on Pune Expressway may add 45m to delivery.',   'queued', NOW());
 
 SELECT setval('notifications_id_seq', 3, true);
+
+
+-- ── 8. Active Shipments ───────────────────────────────────────
+
+INSERT INTO orders (id, order_number, customer_name, customer_email, delivery_address, delivery_city, status, total_amount) VALUES
+    (10, 'ORD-2026-00010', 'Amit Shah',    'amit@example.com',   'Connaught Place', 'Delhi',     'shipped', 15000.00),
+    (11, 'ORD-2026-00011', 'Suresh Raina', 'suresh@example.com', 'Anna Salai',       'Chennai',   'shipped',  8500.00),
+    (12, 'ORD-2026-00012', 'Neha Patel',   'neha@example.com',   'CG Road',          'Ahmedabad', 'shipped', 12000.00),
+    (13, 'ORD-2026-00013', 'Rahul B',      'rahul@example.com',  'Park Street',      'Kolkata',   'shipped',  9500.00);
+
+INSERT INTO shipments (id, tracking_number, order_id, status, origin, weight_kg, volume_m3) VALUES
+    (1, 'SHP-1001', 10, 'in_transit',       'Mumbai',    15.5, 0.05),
+    (2, 'SHP-1002', 11, 'delayed',          'Bangalore',  8.2, 0.03),
+    (3, 'SHP-1003', 12, 'out_for_delivery', 'Pune',      22.0, 0.12),
+    (4, 'SHP-1004', 13, 'preparing',        'Hyderabad',  5.0, 0.02);
+
+SELECT setval('shipments_id_seq', 4, true);
+

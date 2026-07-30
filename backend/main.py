@@ -171,12 +171,12 @@ async def get_dashboard_data():
         async with pool.acquire() as conn:
             # 1. Active Shipments
             shipments_records = await conn.fetch("""
-                SELECT s.tracking_number, s.status, o.delivery_city as destination, 'Origin Warehouse' as origin
+                SELECT s.tracking_number, s.status, o.delivery_city as destination, COALESCE(s.origin, 'Mumbai Warehouse') as origin
                 FROM shipments s
                 JOIN orders o ON s.order_id = o.id
                 WHERE s.status != 'delivered'
-                ORDER BY s.created_at DESC
-                LIMIT 5
+                ORDER BY s.id ASC
+                LIMIT 10
             """)
             shipments = [dict(r) for r in shipments_records]
 
