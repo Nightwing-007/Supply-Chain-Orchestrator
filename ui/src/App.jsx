@@ -1,5 +1,9 @@
 import { useState, useEffect, useRef } from "react";
-import { Search, Moon, Sun, ArrowRight, MessageSquare, Send, AlertTriangle, Package, Activity, Cpu, Database, Network, Server, User } from "lucide-react";
+import { 
+  Search, Moon, Sun, ArrowRight, MessageSquare, Send, AlertTriangle, 
+  Package, Activity, Cpu, Database, Network, Server, User,
+  RefreshCw, GitBranch, CheckCircle2, ShieldAlert
+} from "lucide-react";
 import { runWorkflow, runSingleAgent, fetchDashboardData } from "./api";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, LineChart, Line } from "recharts";
 import ReactMarkdown from "react-markdown";
@@ -63,7 +67,6 @@ export default function App() {
     if (!queryText.trim()) return;
     setMessages(prev => [...prev, { role: 'user', content: queryText }]);
     setIsTyping(true);
-    // ensure sidebar is visible if on mobile
     if (window.innerWidth < 1024) {
       document.querySelector('aside')?.scrollIntoView({ behavior: 'smooth' });
     }
@@ -80,20 +83,20 @@ export default function App() {
         role: 'bot', 
         isError: response.state && response.state[selectedSingleAgent]?.llm_debug_error ? true : false,
         content: (function() {
-  if (response.final_answer && !response.final_answer.startsWith("Standalone Single Agent")) return response.final_answer;
-  if (response.state && response.state[selectedSingleAgent]) {
-     const st = response.state[selectedSingleAgent];
-     if (st.llm_debug_error) return `⚠️ LLM ERROR: ${st.llm_debug_error}`;
-     if (st._adjustment_plan && st._adjustment_plan.summary) return st._adjustment_plan.summary;
-     if (st.analysis) return st.analysis;
-     if (st.message) return st.message;
-     if (st.summary) return st.summary;
-     if (Object.keys(st).length > 0) {
-       return `Agent executed successfully. Result:\n${JSON.stringify(st, null, 2)}`;
-     }
-  }
-  return response.final_answer || response.final_response || "Execution completed successfully.";
-})() 
+          if (response.final_answer && !response.final_answer.startsWith("Standalone Single Agent")) return response.final_answer;
+          if (response.state && response.state[selectedSingleAgent]) {
+             const st = response.state[selectedSingleAgent];
+             if (st.llm_debug_error) return `⚠️ LLM ERROR: ${st.llm_debug_error}`;
+             if (st._adjustment_plan && st._adjustment_plan.summary) return st._adjustment_plan.summary;
+             if (st.analysis) return st.analysis;
+             if (st.message) return st.message;
+             if (st.summary) return st.summary;
+             if (Object.keys(st).length > 0) {
+               return `Agent executed successfully. Result:\n${JSON.stringify(st, null, 2)}`;
+             }
+          }
+          return response.final_answer || response.final_response || "Execution completed successfully.";
+        })() 
       }]);
       
       if (response.state) {
@@ -121,12 +124,139 @@ export default function App() {
     await submitQuery(text);
   };
 
+  const renderKPIBar = () => (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+      {/* 1. Critical Alerts */}
+      <div className="p-6 bg-border-panel/10 border border-border-panel rounded-xl flex items-center justify-between relative overflow-hidden">
+        <div>
+          <span className="text-xs uppercase tracking-widest font-medium text-text-secondary">Critical Alerts</span>
+          <div className="text-3xl font-light tracking-tight mt-1 flex items-center gap-3">
+            {dashboardData?.kpis?.critical_alerts ?? 4}
+            <span className="relative flex h-3 w-3">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+            </span>
+          </div>
+        </div>
+        <div className="p-3 bg-red-500/10 text-red-400 rounded-lg border border-red-500/20">
+          <AlertTriangle size={22} />
+        </div>
+      </div>
+
+      {/* 2. Total Items Tracked */}
+      <div className="p-6 bg-border-panel/10 border border-border-panel rounded-xl flex items-center justify-between">
+        <div>
+          <span className="text-xs uppercase tracking-widest font-medium text-text-secondary">Total Items Tracked</span>
+          <div className="text-3xl font-light tracking-tight mt-1">
+            {dashboardData?.kpis?.total_items ?? 10} <span className="text-xs text-text-secondary font-mono">SKUs</span>
+          </div>
+        </div>
+        <div className="p-3 bg-blue-500/10 text-blue-400 rounded-lg border border-blue-500/20">
+          <Database size={22} />
+        </div>
+      </div>
+
+      {/* 3. Active Shipments */}
+      <div className="p-6 bg-border-panel/10 border border-border-panel rounded-xl flex items-center justify-between">
+        <div>
+          <span className="text-xs uppercase tracking-widest font-medium text-text-secondary">Active Shipments</span>
+          <div className="text-3xl font-light tracking-tight mt-1">
+            {dashboardData?.kpis?.active_shipments ?? dashboardData?.shipments?.length ?? 4} <span className="text-xs text-text-secondary font-mono">EN ROUTE</span>
+          </div>
+        </div>
+        <div className="p-3 bg-emerald-500/10 text-emerald-400 rounded-lg border border-emerald-500/20">
+          <Package size={22} />
+        </div>
+      </div>
+
+      {/* 4. Avg Warehouse Fill % */}
+      <div className="p-6 bg-border-panel/10 border border-border-panel rounded-xl flex items-center justify-between">
+        <div>
+          <span className="text-xs uppercase tracking-widest font-medium text-text-secondary">Avg Warehouse Fill</span>
+          <div className="text-3xl font-light tracking-tight mt-1">
+            {dashboardData?.kpis?.avg_fill_pct ?? 89.0}%
+          </div>
+        </div>
+        <div className="p-3 bg-amber-500/10 text-amber-400 rounded-lg border border-amber-500/20">
+          <Activity size={22} />
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderInventoryGauges = () => (
+    <div className="space-y-4">
+      {(dashboardData?.inventory_items || [
+        { sku: 'SKU-ELEC-001', product_name: 'Wireless Bluetooth Headphones', quantity_on_hand: 5, reorder_point: 100, warehouse_code: 'WH-MUM-01' },
+        { sku: 'SKU-ELEC-002', product_name: '27" 4K Gaming Monitor', quantity_on_hand: 2, reorder_point: 50, warehouse_code: 'WH-MUM-01' },
+        { sku: 'SKU-HOME-001', product_name: 'Ergonomic Mesh Office Chair', quantity_on_hand: 0, reorder_point: 30, warehouse_code: 'WH-MUM-01' },
+        { sku: 'SKU-HOME-002', product_name: 'Motorized Standing Desk Converter', quantity_on_hand: 3, reorder_point: 40, warehouse_code: 'WH-MUM-01' },
+      ]).map((item, idx) => {
+        const stockRatio = item.reorder_point > 0 ? (item.quantity_on_hand / item.reorder_point) : 1;
+        const fillPercentage = Math.min(Math.round(stockRatio * 100), 100);
+        let barColor = "bg-emerald-500";
+        let badgeColor = "bg-emerald-500/10 text-emerald-400 border-emerald-500/20";
+        let statusLabel = "Healthy";
+
+        if (item.quantity_on_hand === 0 || stockRatio <= 0.25) {
+          barColor = "bg-red-500";
+          badgeColor = "bg-red-500/10 text-red-400 border-red-500/20";
+          statusLabel = item.quantity_on_hand === 0 ? "OUT OF STOCK" : "Critical Deficit";
+        } else if (item.quantity_on_hand <= item.reorder_point) {
+          barColor = "bg-amber-500";
+          badgeColor = "bg-amber-500/10 text-amber-400 border-amber-500/20";
+          statusLabel = "Low Stock Alert";
+        }
+
+        return (
+          <div key={idx} className="p-6 border border-border-panel bg-border-panel/10 rounded-xl space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-3">
+                  <span className="font-mono text-xs px-2 py-0.5 bg-border-panel rounded text-text-secondary">{item.sku}</span>
+                  <h3 className="font-medium text-base tracking-wide">{item.product_name}</h3>
+                </div>
+                <p className="text-xs text-text-secondary mt-1">Warehouse Hub: <span className="font-mono">{item.warehouse_code || 'WH-MUM-01'}</span></p>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className={`text-xs px-3 py-1 rounded-full border font-medium ${badgeColor}`}>
+                  {statusLabel}
+                </span>
+                <button
+                  onClick={() => submitQuery(`Check inventory and create an auto-restock plan for SKU ${item.sku} (${item.product_name})`)}
+                  className="text-xs font-medium uppercase tracking-wider px-3 py-1.5 bg-accent-primary/20 text-accent-primary border border-accent-primary/30 rounded-lg hover:bg-accent-primary hover:text-bg-base transition-colors cursor-pointer flex items-center gap-1.5"
+                >
+                  <RefreshCw size={13} />
+                  Auto-Restock
+                </button>
+              </div>
+            </div>
+
+            {/* Visual Progress Bar */}
+            <div className="space-y-1.5">
+              <div className="flex justify-between text-xs font-mono text-text-secondary">
+                <span>Available: <strong className="text-text-primary">{item.quantity_on_hand} units</strong></span>
+                <span>Reorder Threshold: <strong className="text-text-primary">{item.reorder_point} units</strong></span>
+              </div>
+              <div className="w-full bg-border-panel/40 h-2.5 rounded-full overflow-hidden">
+                <div className={`h-full transition-all duration-500 ${barColor}`} style={{ width: `${Math.max(fillPercentage, 4)}%` }}></div>
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+
   const renderDashboard = () => (
     <>
-      <header className="mb-16">
+      <header className="mb-12">
         <h1 className="text-4xl font-light tracking-tight mb-2">Live Telemetry</h1>
         <p className="text-text-secondary">Monitoring global supply chain metrics directly from PostgreSQL.</p>
       </header>
+
+      {/* Top 4-Column KPI Summary Bar */}
+      {renderKPIBar()}
 
       {isLoadingDashboard ? (
         <div className="text-text-secondary text-sm">Loading real-time data from database...</div>
@@ -137,7 +267,7 @@ export default function App() {
               <h2 className="text-sm font-medium tracking-wide text-text-secondary uppercase">Route Tracking (Load over time)</h2>
               <span className="text-xs font-mono text-text-secondary text-accent-primary">ACTIVE</span>
             </div>
-            <div className="h-[400px] w-full flex flex-col items-center justify-center bg-border-panel/10 p-4 rounded-xl border border-border-panel">
+            <div className="h-[360px] w-full flex flex-col items-center justify-center bg-border-panel/10 p-4 rounded-xl border border-border-panel">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={dashboardData?.flow || []} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                   <defs>
@@ -203,7 +333,7 @@ export default function App() {
 
   const renderShipments = () => (
     <>
-      <header className="mb-16">
+      <header className="mb-12">
         <h1 className="text-4xl font-light tracking-tight mb-2">Active Shipments</h1>
         <p className="text-text-secondary">
           {isLoadingDashboard 
@@ -211,6 +341,8 @@ export default function App() {
             : `Tracking ${dashboardData?.shipments?.length || 0} ongoing freight movements.`}
         </p>
       </header>
+
+      {renderKPIBar()}
 
       <div className="w-full">
         <div className="grid grid-cols-5 border-b border-border-panel pb-4 mb-4 text-xs font-medium tracking-widest text-text-secondary uppercase">
@@ -244,33 +376,45 @@ export default function App() {
 
   const renderRisks = () => (
     <>
-      <header className="mb-16">
-        <h1 className="text-4xl font-light tracking-tight mb-2">Risk Intel</h1>
-        <p className="text-text-secondary">Automated vulnerability and disruption tracking from database.</p>
+      <header className="mb-12">
+        <h1 className="text-4xl font-light tracking-tight mb-2">Risk Intel & Inventory Gauges</h1>
+        <p className="text-text-secondary">Automated vulnerability tracking and real-time inventory threshold gauges.</p>
       </header>
 
-      <div className="space-y-6">
-        {isLoadingDashboard ? (
-          <div className="text-text-secondary text-sm">Analyzing supply chain risks...</div>
-        ) : dashboardData?.risks?.map((risk, i) => (
-          <div key={i} className={`p-6 border flex items-start gap-4 rounded-xl ${
-            risk.level === 'Critical' ? 'border-accent-critical/20 bg-accent-critical/10' : 'border-accent-warning/20 bg-accent-warning/10'
-          }`}>
-            <AlertTriangle size={20} className={risk.level === 'Critical' ? 'text-accent-critical' : 'text-accent-warning'} />
-            <div>
-              <h3 className={`text-sm font-medium uppercase tracking-wider mb-2 ${
-                risk.level === 'Critical' ? 'text-accent-critical' : 'text-accent-warning'
-              }`}>{risk.level}</h3>
-              <p className="text-sm font-light leading-relaxed">{risk.text}</p>
-              <div className="mt-4 flex gap-4">
-                <button onClick={() => submitQuery(`Create a mitigation plan for the following risk: ${risk.text}`)} className={`text-xs uppercase tracking-widest font-medium hover:opacity-70 transition-opacity ${
-                  risk.level === 'Critical' ? 'text-accent-critical' : 'text-accent-warning'
-                }`}>Mitigate</button>
-                <button onClick={() => submitQuery(`Provide more details and analysis for the following risk: ${risk.text}`)} className="text-xs uppercase tracking-widest font-medium text-text-secondary hover:text-text-primary transition-colors">Details</button>
+      {renderKPIBar()}
+
+      <div className="space-y-8">
+        <section>
+          <h2 className="text-sm font-medium uppercase tracking-widest text-text-secondary mb-4">Stock Health Gauges & Thresholds</h2>
+          {renderInventoryGauges()}
+        </section>
+
+        <section>
+          <h2 className="text-sm font-medium uppercase tracking-widest text-text-secondary mb-4">System Disruption Alerts</h2>
+          <div className="space-y-4">
+            {isLoadingDashboard ? (
+              <div className="text-text-secondary text-sm">Analyzing supply chain risks...</div>
+            ) : dashboardData?.risks?.map((risk, i) => (
+              <div key={i} className={`p-6 border flex items-start gap-4 rounded-xl ${
+                risk.level === 'Critical' ? 'border-accent-critical/20 bg-accent-critical/10' : 'border-accent-warning/20 bg-accent-warning/10'
+              }`}>
+                <AlertTriangle size={20} className={risk.level === 'Critical' ? 'text-accent-critical' : 'text-accent-warning'} />
+                <div className="flex-1">
+                  <h3 className={`text-sm font-medium uppercase tracking-wider mb-2 ${
+                    risk.level === 'Critical' ? 'text-accent-critical' : 'text-accent-warning'
+                  }`}>{risk.level}</h3>
+                  <p className="text-sm font-light leading-relaxed">{risk.text}</p>
+                  <div className="mt-4 flex gap-4">
+                    <button onClick={() => submitQuery(`Create a mitigation plan for the following risk: ${risk.text}`)} className={`text-xs uppercase tracking-widest font-medium hover:opacity-70 transition-opacity ${
+                      risk.level === 'Critical' ? 'text-accent-critical' : 'text-accent-warning'
+                    }`}>Mitigate</button>
+                    <button onClick={() => submitQuery(`Provide more details and analysis for the following risk: ${risk.text}`)} className="text-xs uppercase tracking-widest font-medium text-text-secondary hover:text-text-primary transition-colors">Details</button>
+                  </div>
+                </div>
               </div>
-            </div>
+            ))}
           </div>
-        ))}
+        </section>
       </div>
     </>
   );
@@ -384,34 +528,35 @@ export default function App() {
         </main>
       </div>
 
-      {/* RIGHT COLUMN: Gemini - Fixed width, strictly aligned padding */}
-      <aside className="w-full lg:w-[420px] h-[50vh] lg:h-full flex flex-col shrink-0 bg-bg-base border-t lg:border-t-0 lg:border-l border-border-panel shadow-2xl z-10">
+      {/* RIGHT COLUMN: CHAT PANEL */}
+      <aside className="w-full lg:w-[440px] h-[50vh] lg:h-full flex flex-col shrink-0 bg-bg-base border-t lg:border-t-0 lg:border-l border-border-panel shadow-2xl z-10">
         
-        <div className="h-20 px-10 flex items-center justify-between shrink-0 border-b border-border-panel">
+        <div className="h-20 px-6 lg:px-8 flex items-center justify-between shrink-0 border-b border-border-panel">
           <span className="text-sm font-medium tracking-tight">CHAT</span>
           <div className="flex items-center gap-2 bg-border-panel/30 p-1 rounded-md">
             <button 
               onClick={() => setOrchestratorMode('single')}
-              className={`text-xs px-2 py-1 rounded transition-colors ${orchestratorMode === 'single' ? 'bg-bg-panel shadow-sm text-text-primary font-medium' : 'text-text-secondary hover:text-text-primary'}`}
+              className={`text-xs px-2.5 py-1 rounded transition-colors cursor-pointer ${orchestratorMode === 'single' ? 'bg-bg-panel shadow-sm text-text-primary font-medium' : 'text-text-secondary hover:text-text-primary'}`}
             >
               Single Agent
             </button>
             <button 
               onClick={() => setOrchestratorMode('multi')}
-              className={`text-xs px-2 py-1 rounded transition-colors ${orchestratorMode === 'multi' ? 'bg-bg-panel shadow-sm text-text-primary font-medium' : 'text-text-secondary hover:text-text-primary'}`}
+              className={`text-xs px-2.5 py-1 rounded transition-colors cursor-pointer ${orchestratorMode === 'multi' ? 'bg-bg-panel shadow-sm text-text-primary font-medium' : 'text-text-secondary hover:text-text-primary'}`}
             >
               Multi-Agent Supervisor
             </button>
           </div>
         </div>
 
+        {/* Single Agent Selection Dropdown */}
         {orchestratorMode === 'single' && (
-          <div className="px-10 py-4 border-b border-border-panel shrink-0 bg-border-panel/5 flex items-center gap-4">
+          <div className="px-6 lg:px-8 py-3.5 border-b border-border-panel shrink-0 bg-border-panel/5 flex items-center gap-4">
             <span className="text-xs font-medium text-text-secondary uppercase tracking-widest">Select Agent:</span>
             <select 
               value={selectedSingleAgent}
               onChange={(e) => setSelectedSingleAgent(e.target.value)}
-              className="bg-bg-panel text-text-primary text-sm p-1.5 rounded border border-border-panel focus:outline-none focus:border-text-primary flex-1"
+              className="bg-bg-panel text-text-primary text-sm p-1.5 rounded border border-border-panel focus:outline-none focus:border-text-primary flex-1 cursor-pointer"
             >
               {AGENTS.map(agent => (
                 <option key={agent.id} value={agent.id}>{agent.name}</option>
@@ -420,14 +565,51 @@ export default function App() {
           </div>
         )}
 
+        {/* Multi-Agent Supervisor Execution Pipeline */}
+        {orchestratorMode === "multi" && (
+          <div className="px-6 lg:px-8 py-3 border-b border-border-panel bg-border-panel/10 shrink-0">
+            <div className="text-[10px] font-medium uppercase tracking-widest text-text-secondary mb-2 flex items-center justify-between">
+              <span>Multi-Agent Routing Pipeline</span>
+              <span className="text-accent-primary font-mono">{isTyping ? "PROCESSING" : "READY"}</span>
+            </div>
+            <div className="flex items-center gap-2 overflow-x-auto py-1 hide-scrollbar">
+              <div className="flex items-center gap-1 px-2.5 py-1 bg-border-panel/40 border border-border-panel rounded-full text-xs font-medium shrink-0">
+                <GitBranch size={12} className="text-accent-primary" />
+                <span>Supervisor</span>
+              </div>
+              <ArrowRight size={12} className="text-text-secondary shrink-0" />
+              {AGENTS.map((ag) => {
+                const isExecuted = agentState && agentState[ag.id];
+                return (
+                  <div
+                    key={ag.id}
+                    className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs transition-colors shrink-0 ${
+                      isExecuted
+                        ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-medium"
+                        : "bg-border-panel/20 text-text-secondary border border-border-panel/30"
+                    }`}
+                  >
+                    <ag.icon size={12} />
+                    <span>{ag.name}</span>
+                  </div>
+                );
+              })}
+              <ArrowRight size={12} className="text-text-secondary shrink-0" />
+              <div className="flex items-center gap-1 px-2.5 py-1 bg-accent-primary/20 text-accent-primary border border-accent-primary/30 rounded-full text-xs font-medium shrink-0">
+                <CheckCircle2 size={12} />
+                <span>FINISH</span>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="flex-1 flex flex-col overflow-hidden">
-          
-          <div className="flex-1 overflow-y-auto px-10 py-8 flex flex-col gap-6 text-sm">
+          <div className="flex-1 overflow-y-auto px-6 lg:px-8 py-6 flex flex-col gap-6 text-sm">
             {messages.length === 0 ? (
               <div className="flex-1 flex flex-col justify-end text-text-secondary">
-                <div className="space-y-5 w-full">
-                  {['Check inventory for Warehouse A', 'Run route optimization', 'Analyze demand forecast'].map((action) => (
-                    <div key={action} onClick={() => setChatInput(action)} className="flex items-center gap-4 cursor-pointer hover:text-text-primary transition-colors group pb-2 border-b border-transparent hover:border-border-panel">
+                <div className="space-y-4 w-full">
+                  {['Check inventory stock levels & create reorder plan', 'Optimize delivery routes for active orders', 'Analyze demand forecast & trend volatility'].map((action) => (
+                    <div key={action} onClick={() => setChatInput(action)} className="flex items-center gap-3 cursor-pointer hover:text-text-primary transition-colors group pb-2 border-b border-transparent hover:border-border-panel">
                       <ArrowRight size={14} className="opacity-0 group-hover:opacity-100 transition-opacity text-text-primary" />
                       <span className="text-sm font-light">{action}</span>
                     </div>
@@ -483,7 +665,7 @@ export default function App() {
             )}
           </div>
 
-          <div className="px-10 py-6 shrink-0 border-t border-border-panel bg-bg-base">
+          <div className="px-6 lg:px-8 py-5 shrink-0 border-t border-border-panel bg-bg-base">
             <form onSubmit={handleSend} className="relative flex items-center">
               <input
                 type="text"

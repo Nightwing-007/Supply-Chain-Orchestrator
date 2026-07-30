@@ -221,11 +221,47 @@ async def get_dashboard_data():
                     "text": "System running normally, but monitoring global events."
                 }]
 
+            # 5. KPI Summary Metrics
+            critical_count = await conn.fetchval("""
+                SELECT COUNT(*) FROM inventory WHERE quantity_on_hand <= reorder_point
+            """) or 0
+            total_items = await conn.fetchval("""
+                SELECT COUNT(*) FROM products
+            """) or 10
+            avg_warehouse_fill = await conn.fetchval("""
+                SELECT ROUND(AVG(used_capacity::numeric / NULLIF(total_capacity, 0)::numeric * 100), 1)
+                FROM warehouses WHERE is_active = TRUE
+            """) or 89.0
+
+            # 6. Detailed Inventory Progress Metrics
+            inventory_records = await conn.fetch("""
+                SELECT 
+                    p.sku, 
+                    p.name as product_name, 
+                    i.quantity_on_hand, 
+                    i.reorder_point, 
+                    i.reorder_qty,
+                    w.code as warehouse_code
+                FROM inventory i
+                JOIN products p ON i.product_id = p.id
+                JOIN warehouses w ON i.warehouse_id = w.id
+                ORDER BY (i.quantity_on_hand::float / NULLIF(i.reorder_point, 0)) ASC
+                LIMIT 8
+            """)
+            inventory_items = [dict(r) for r in inventory_records]
+
             return {
                 "shipments": shipments,
                 "performance": performance,
                 "flow": flow,
-                "risks": risks
+                "risks": risks,
+                "kpis": {
+                    "critical_alerts": critical_count,
+                    "total_items": total_items,
+                    "active_shipments": len(shipments),
+                    "avg_fill_pct": float(avg_warehouse_fill),
+                },
+                "inventory_items": inventory_items,
             }
     except Exception as exc:
         logger.exception("Error fetching dashboard data: %s", exc)
