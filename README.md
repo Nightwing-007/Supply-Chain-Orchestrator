@@ -1,151 +1,182 @@
-# Supply Chain Orchestrator — CampusOS 🚛
+# Supply Chain Orchestrator — Autonomous Multi-Agent Logistics
 
-**Smart Logistics Multi-Agent System Powered by LangGraph, PostgreSQL, FastAPI, Groq API, GitHub Models & Google Gemini**
-
-[![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-blue.svg)](https://www.python.org/)
-[![LangGraph](https://img.shields.io/badge/Orchestration-LangGraph-orange.svg)](https://github.com/langchain-ai/langgraph)
-[![PostgreSQL](https://img.shields.io/badge/Database-PostgreSQL%2014%2B-blue.svg)](https://www.postgresql.org/)
-[![FastAPI](https://img.shields.io/badge/API-FastAPI-green.svg)](https://fastapi.tiangolo.com/)
-[![React](https://img.shields.io/badge/Frontend-React%2019%20%7C%20Vite-blue.svg)](https://react.dev/)
-[![LLM API](https://img.shields.io/badge/LLM-Groq%20%7C%20GitHub%20Models%20%7C%20Gemini-purple.svg)](https://groq.com/)
+> An enterprise-grade, autonomous supply chain command center powered by LangGraph multi-agent orchestration, a 3-tier resilient LLM fallback architecture, and real-time PostgreSQL telemetry.
 
 ---
 
-## Executive Summary
+## 📖 Overview
 
-**Supply Chain Orchestrator** is an enterprise-grade, autonomous multi-agent logistics platform built for smart supply chain intelligence. Combining Python, LangGraph, PostgreSQL, FastAPI, React 19, and a high-speed **3-Tier LLM Architecture** (Primary: Groq `llama-3.3-70b-versatile`, Secondary: GitHub Models `gpt-4o-mini`, Tertiary: Google Gemini 2.0 Flash), the platform coordinates **6 specialised single AI agents** that operate harmoniously across inventory planning, warehouse operations, demand forecasting, route optimisation, fleet management, and customer communications.
+Modern global supply chains suffer from severe fragmentation—siloed inventory monitoring, delayed restock triggers, and disjointed communication between logistics teams. 
 
-By pairing deterministic domain algorithms (e.g., Cycle Sort, Nearest Neighbor TSP, Exponential Smoothing, PostgreSQL Window Functions, Haversine Distance) with high-speed LLM reasoning, Supply Chain Orchestrator bridges operational silos into a self-correcting, real-time logistics engine.
+**Supply Chain Orchestrator** bridges this gap by unifying live telemetry with autonomous AI agents. Powered by a multi-agent LangGraph supervisor, the system continuously analyzes stock levels, forecasts demand spikes, optimizes freight routing, and automatically drafts restock notifications—all surfaced through a Wayne Enterprises-grade tactical command dashboard.
 
 ---
 
-## System Architecture: The 3-Phase Journey
+## ✨ Key Features
+
+- **🌐 Live Telemetry Command Dashboard**: Real-time KPI summary bar, interactive Recharts visualizations comparing stock levels against safety reorder thresholds, and en-route shipment tracking powered directly by PostgreSQL telemetry.
+- **🛒 Authorized Shop Owner Portal**: Secure authentication (`admin` / `password123`) granting direct control over product catalogs, inventory quantities, reorder thresholds, and real-time CRUD operations.
+- **🤖 Multi-Agent LangGraph Supervisor**: Autonomous supervisor agent that evaluates complex supply chain queries, routes sub-tasks in parallel to domain-specialized worker agents, and synthesizes structured Markdown reporting.
+- **⚡ Resilient 3-Tier LLM Fallback Architecture**: Zero-downtime AI gateway that seamlessly failovers across multiple tier-1 providers if rate limits or outages occur.
+- **💎 Tactical Glassmorphism UI**: Built with React 19, Tailwind CSS, and Framer Motion, featuring fluid dark/light theme switching, debounced search filters, and hardware-accelerated animations.
+
+---
+
+## 🏗️ System Architecture
 
 ```
-                                  USER / JUDGE INTERFACE
-                                ┌────────────────────────┐
-                                │   React 19 / Vite UI   │
-                                │      (ui/src/App.jsx)  │
-                                └───────────┬────────────┘
-                                            │ POST /api/workflow
-                                            ▼
-                                   FASTAPI REST SERVER
-                                ┌────────────────────────┐
-                                │       (main.py)        │
-                                └───────────┬────────────┘
-                                            │
-                                            ▼
-                                LANGGRAPH SUPERVISOR GRAPH
-                         ┌─────────────────────────────────────┐
-                         │      (orchestrator/supervisor.py)   │
-                         └──────────────────┬──────────────────┘
-                                            │
-       ┌───────────────────┬────────────────┼───────────────────┬───────────────────┐
-       │                   │                │                   │                   │
-       ▼                   ▼                ▼                   ▼                   ▼
-┌──────────────┐   ┌──────────────┐  ┌──────────────┐   ┌──────────────┐   ┌──────────────┐   ┌──────────────┐
-│  Agent 1:    │   │  Agent 2:    │  │  Agent 3:    │   │  Agent 4:    │   │  Agent 5:    │   │  Agent 6:    │
-│ Inventory    │   │  Warehouse   │  │  Demand      │   │  Route       │   │  Fleet       │   │  Customer    │
-│ Planning     │   │  Operations  │  │  Forecasting │   │  Optimisation│   │  Management  │   │ Notification │
-└──────┬───────┘   └──────┬───────┘  └──────┬───────┘   └──────┬───────┘   └──────┬───────┘   └──────┬───────┘
-       │                  │                 │                  │                  │                  │
-       └──────────────────┴─────────────────┼──────────────────┴──────────────────┴──────────────────┘
-                                            ▼
-                       PostgreSQL Shared State Store (sco Schema)
-                                            ▲
-                                            │
-                    3-Tier LLM Gateway (Groq ──► GitHub Models ──► Gemini)
+                       ┌─────────────────────────────────────────┐
+                       │          React 19 Command UI            │
+                       └───────────────────┬─────────────────────┘
+                                           │ API / WebSockets
+                                           ▼
+                       ┌─────────────────────────────────────────┐
+                       │          FastAPI Web Server             │
+                       └───────────────────┬─────────────────────┘
+                                           │
+             ┌─────────────────────────────┴─────────────────────────────┐
+             ▼                                                           ▼
+┌─────────────────────────┐                                 ┌─────────────────────────┐
+│   PostgreSQL Telemetry  │                                 │ LangGraph Orchestrator  │
+│  (products & inventory) │                                 │  (Multi-Agent Network)  │
+└─────────────────────────┘                                 └────────────┬────────────┘
+                                                                         │
+                                                                         ▼
+                                                    ┌─────────────────────────────────────────┐
+                                                    │    Unified 3-Tier LLM Gateway           │
+                                                    └────────────────────┬────────────────────┘
+                                                                         │
+                                       ┌─────────────────────────────────┼─────────────────────────────────┐
+                                       │ Failover 1                      │ Failover 2                      │
+                                       ▼                                 ▼                                 ▼
+                         ┌──────────────────────────┐      ┌──────────────────────────┐      ┌──────────────────────────┐
+                         │   Tier 1: Groq API       │ ────►│ Tier 2: GitHub Models    │ ────►│  Tier 3: Google Gemini   │
+                         │ (Llama-3.3-70B-Versatile)│      │      (GPT-4o-Mini)       │      │     (Gemini-2.0-Flash)   │
+                         └──────────────────────────┘      └──────────────────────────┘      └──────────────────────────┘
 ```
 
-### Phase 1: Modular Single AI Agents & Domain Guardrails (Single Agent Mode)
-Built **6 independent, stateless async Python agents** with strict JSON input/output contracts. Each agent features:
-- **Domain Guardrails:** Automatically evaluates user intent and gracefully rejects out-of-scope requests with polite redirection to the relevant domain agent or Multi-Agent Supervisor.
-- **Conversational Formatting:** Formats chat outputs into detailed, self-contained Markdown with itemized metrics (SKUs, quantities, codes, distances) instead of vague summary phrases.
-- **Algorithmic Core:** Heavy math and SQL processing paired with high-speed 3-tier LLM fallback gateway (Groq API Primary, GitHub Models Secondary, Google Gemini Tertiary).
+### 🧠 Resilient 3-Tier LLM Gateway
 
-### Phase 2: LangGraph Supervisor Orchestrator & REST API (Multi Agent Mode)
-Integrated all 6 agents into a **LangGraph StateGraph shared state network** managed by a central **Supervisor Routing Engine**. The supervisor analyzes state, past execution history, and user query to dynamically route execution to appropriate agents in iterative loops (`Supervisor ──► Agent ──► Supervisor ──► FINISH`). Exposed via a production-ready **FastAPI REST API** (`POST /api/workflow`) with connection pool lifespan hooks and OpenAPI documentation.
+To guarantee enterprise-grade reliability and avoid single-point API outages during automated workflows, all agents invoke LLM services through a unified fallback chain:
 
-### Phase 3: React 19 UI, Real-Time Dashboard & Markdown Chat
-Created a modern dark-mode interface in **React 19 + Vite + Tailwind CSS** (`ui/src/App.jsx`). Features:
-- Interactive real-time metrics telemetry dashboard rendered with Recharts (including live active shipment tracking).
-- Conversational chat interface with **`react-markdown`** parsing for rich formatting (bolding, lists, code blocks).
-- Mode toggle for Single Agent vs. Multi-Agent Supervisor execution.
+1. **Tier 1 (Primary): Groq API** — Executes `llama-3.3-70b-versatile` via ultra-fast LPUs using `AsyncOpenAI`.
+2. **Tier 2 (Secondary): GitHub Models** — Automatically triggers if Groq encounters rate limits (`429`) or errors, routing to `gpt-4o-mini` via Azure OpenAI compatible endpoints.
+3. **Tier 3 (Tertiary): Google Gemini** — Final fallback executing `gemini-2.0-flash` via the official `google-genai` SDK.
+
+### 👥 Specialized Multi-Agent Network
+
+1. **Supervisor Agent**: Parses incoming queries, decides execution strategy (single agent vs multi-agent workflow), delegates to worker nodes, and synthesizes final Markdown reports.
+2. **Inventory Planning Agent**: Identifies stockout risks, compares available inventory against safety thresholds, and drafts reorder plans.
+3. **Warehouse Ops Agent**: Monitors bin capacity, warehouse fill percentages, and storage constraints across regional hubs.
+4. **Demand Forecasting Agent**: Analyzes historical sales velocity and seasonal trends to predict stock depletion windows.
+5. **Route Optimization Agent**: Evaluates freight transit routes and active shipment bottlenecks to minimize delays.
+6. **Fleet Management Agent**: Tracks vehicle assignments, driver availability, and maintenance schedules.
+7. **Customer Notification Agent**: Formats and dispatches automated alerts for restock events and delivery updates.
 
 ---
 
-## The 6 Specialised AI Agents
+## 🛠️ Tech Stack
 
-| Agent | Domain Role | Algorithmic Core | LLM Synergy & Domain Guardrails |
-|---|---|---|---|
-| **1. Inventory Planning Agent** | Monitors stock levels across warehouses and generates reorder plans. | Low-stock deficit detection (`quantity_on_hand <= reorder_point`), 4-tier priority classification. | Generates structured **Reorder Plans** with itemized SKU restock quantities; rejects out-of-scope queries gracefully. |
-| **2. Warehouse Operations Agent** | Manages warehouse capacity, layout efficiency, and pick list ordering. | **Cycle Sort** algorithm by turnover frequency for minimal physical item moves; capacity thresholding (>85%). | Drafts **Warehouse Optimisation Plans** with space reallocation strategies and bottleneck warnings. |
-| **3. Demand Forecasting Agent** | Predicts product demand over upcoming 7-day windows. | **PostgreSQL Window Functions** (`AVG() OVER`) + **Simple Exponential Smoothing (SES)** ($\alpha=0.3$). | Analyzes volatility signals to apply qualitative market trend adjustments ($\le \pm 30\%$). |
-| **4. Route Optimization Agent** | Sequences delivery stops to minimize travel distance and time. | **Haversine Distance** math + **Nearest Neighbor (Greedy TSP)** route sequencing. | Evaluates live traffic/weather hazards and SLA deadlines to generate **Dynamic Route Adjustment Plans**. |
-| **5. Fleet Management Agent** | Tracks fleet telemetry, service schedules, and vehicle health. | Telemetry calculations (`days_since_service`, `mileage_km`, `fuel_level_pct`) and utilization metrics. | Categorises flagged vehicles into **Immediate Grounding**, **Schedule End-of-Week**, or **Local Routes Only**. |
-| **6. Customer Notification Agent** | Automates customer updates across Email and SMS channels. | Rule-based template generator for fallback messages categorized by operational event type. | Drafts empathetic, context-aware **Email & SMS messages** (SMS $\le 160$ chars) adapted to news severity. |
+| Domain | Technologies Used |
+|---|---|
+| **Frontend** | React 19, Vite, Tailwind CSS, Framer Motion, Recharts, React Hot Toast, Lucide Icons |
+| **Backend** | Python 3.12, FastAPI, LangGraph, AsyncOpenAI, Google GenAI SDK, Pydantic v2 |
+| **Database** | PostgreSQL 15+, Asyncpg connection pooling |
+| **Testing** | Pytest, Pytest-Asyncio, Oxlint |
 
 ---
 
-## Tech Stack
+## 🚀 Setup & Installation
 
-- **Core Language:** Python 3.11+ (Standard CPython) with full `async/await` execution
-- **Multi-Agent Orchestration:** LangGraph (`StateGraph` state graph & conditional routing)
-- **Database Layer:** PostgreSQL 14+ with `asyncpg` connection pooling
-- **REST API Framework:** FastAPI + Uvicorn with CORS middleware
-- **Frontend UI:** React 19 + Vite + Tailwind CSS + Lucide Icons + `react-markdown` (`ui/`)
-- **Primary LLM:** Groq API `llama-3.3-70b-versatile` (via `AsyncOpenAI` client)
-- **Secondary Fallback LLM:** GitHub Models GPT-4o-mini (via Azure-compatible OpenAI client)
-- **Tertiary Fallback LLM:** Google Gemini 2.0 Flash (via `google-genai` SDK)
-- **Validation & Serialization:** Pydantic v2 & `pydantic-settings`
-- **Testing:** `pytest` + `pytest-asyncio` + `httpx`
+### Prerequisites
+
+- **Python 3.12+**
+- **Node.js 18+** & **npm**
+- **PostgreSQL 15+** (running locally or via cloud instance)
 
 ---
 
-## Repository Structure
+### 1. Environment Configuration
 
+Navigate to the `backend/` directory and copy the environment template:
+
+```bash
+cd backend
+cp .env.example .env
 ```
-AgentVerse/
-├── README.md                       # Full project architecture & showcase
-├── DEVELOPER.md                    # Detailed developer setup & execution guide
-├── LEARNING_GUIDE.md               # Step-by-step learning guide
-├── .gitignore                      # Git ignore rule definitions
-│
-├── backend/                        # FastAPI Backend & Multi-Agent Core
-│   ├── .env.example                # Template for environment variables
-│   ├── requirements.txt            # Pinned Python dependencies
-│   ├── main.py                     # FastAPI server & CLI entrypoint
-│   ├── seed_db.py                  # Database schema DDL & seed script
-│   │
-│   ├── config/
-│   │   └── settings.py             # Central Pydantic-settings configuration
-│   │
-│   ├── db/
-│   │   ├── schema.sql              # PostgreSQL DDL (13 tables, enums, indexes)
-│   │   ├── seed.sql                # Seed dataset (Warehouses, Inventory, Vehicles, Orders, Shipments)
-│   │   └── connection.py           # Singleton asyncpg connection pool
-│   │
-│   ├── services/
-│   │   └── llm_service.py          # Unified LLM Gateway (Groq Primary + GitHub Secondary + Gemini Tertiary)
-│   │
-│   ├── models/                     # Pydantic v2 domain schemas
-│   ├── agents/                     # The 6 Specialised AI Agents with Domain Guardrails
-│   ├── orchestrator/               # LangGraph StateGraph Supervisor Orchestrator
-│   └── tests/                      # Async unit test suite (124+ test cases)
-│       ├── test_inventory_agent.py
-│       ├── test_warehouse_agent.py
-│       ├── test_demand_agent.py
-│       ├── test_route_agent.py
-│       ├── test_fleet_agent.py
-│       ├── test_notification_agent.py
-│       ├── test_supervisor.py
-│       ├── test_main.py
-│       └── test_llm_service.py
-│
-└── ui/                             # React 19 + Vite UI
-    ├── package.json
-    ├── vite.config.js
-    └── src/
-        ├── App.jsx                 # React Dashboard & Markdown Chat Interface
-        └── api.js                  # Axios REST API client
+
+Edit `.env` with your database credentials and API keys:
+
+```env
+DATABASE_URL=postgresql://postgres:password123@localhost:5432/supply_chain
+GROQ_API_KEY=gsk_your_groq_api_key_here
+GITHUB_TOKEN=ghp_your_github_token_here
+GOOGLE_API_KEY=AIzaSy_your_gemini_api_key_here
 ```
+
+---
+
+### 2. Backend Setup & Server Execution
+
+From the root directory:
+
+```bash
+# Navigate to backend
+cd backend
+
+# Create and activate Python virtual environment
+python -m venv venv
+# On Windows:
+venv\Scripts\activate
+# On Linux/macOS:
+source venv/bin/activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Seed PostgreSQL Database & Run Migrations
+python seed_db.py
+
+# Start FastAPI Dev Server
+python main.py
+```
+
+The FastAPI backend will start running at `http://localhost:8000`. You can inspect interactive OpenAPI documentation at `http://localhost:8000/docs`.
+
+---
+
+### 3. Frontend Setup & Execution
+
+Open a new terminal window:
+
+```bash
+# Navigate to UI directory
+cd ui
+
+# Install dependencies
+npm install
+
+# Run Vite development server
+npm run dev
+```
+
+Open your browser and navigate to `http://localhost:5173`.
+
+---
+
+### 🧪 Running Tests
+
+To run the automated backend test suite (22 unit & integration tests covering authentication, CRUD operations, supervisor routing, and fallback gateway logic):
+
+```bash
+cd backend
+python -m pytest tests/ -v
+```
+
+---
+
+## 🔐 Credentials for Demo
+
+- **Shop Owner Portal Login**:
+  - **Username**: `admin`
+  - **Password**: `password123`
